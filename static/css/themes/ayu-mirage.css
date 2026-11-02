@@ -1,0 +1,50 @@
+/* Тема Ayu Mirage — dark
+   Палитра: Ayu. Значения цветов взяты из официальной палитры темы.
+   Селектор работает и для <html>, и для вложенных превью-карточек. */
+
+[data-theme="ayu-mirage"] {
+  color-scheme: dark;
+
+  /* --- сырая палитра ------------------------------------------------ */
+  --raw-base: #1f2430;
+  --raw-mantle: #232834;
+  --raw-crust: #191e2a;
+  --raw-text: #cccac2;
+  --raw-subtext: #a2a6b0;
+  --raw-overlay: #6e7a91;
+  --raw-surface2: #3b4357;
+  --raw-surface1: #2e3546;
+  --raw-surface0: #262c3a;
+  --raw-accent: #ffcc66;
+  --raw-red: #f28779;
+  --raw-green: #d5ff80;
+  --raw-yellow: #ffd173;
+  --raw-blue: #73d0ff;
+  --raw-peach: #ff9d5c;
+  --raw-mauve: #dfbfff;
+
+  /* --- семантика (обязательный минимум) ----------------------------- */
+  --bg: var(--raw-base);
+  --bg-alt: var(--raw-mantle);
+  --bg-elevated: #262c3a;
+  --bg-inset: var(--raw-crust);
+  --fg: var(--raw-text);
+  --fg-muted: #a2a6b0;
+  --fg-subtle: var(--raw-overlay);
+  --accent: var(--raw-accent);
+  --accent-fg: #1f2430;
+  --accent-soft: rgba(255, 204, 102, 0.14);
+  --border: #2e3546;
+  --border-strong: #3b4357;
+  --danger: #f28779;
+  --success: var(--raw-green);
+  --warning: #ffcc66;
+  --hover: #272d3c;
+  --active: rgba(255, 204, 102, 0.16);
+  --selection: rgba(255, 204, 102, 0.24);
+  --scrollbar: #3b4357;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --overlay: rgba(0, 0, 0, 0.6);
+  --bubble-own: rgba(255, 204, 102, 0.12);
+  --bubble-own-fg: #cccac2;
+}

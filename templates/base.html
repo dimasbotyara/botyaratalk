@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+
+<html lang="{{ lang }}" data-theme="{{ theme }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <title>{% block title %}botyaratalk{% endblock %}</title>
+  <meta name="description" content="botyaratalk — LAN messenger with voice, video and screen sharing">
+
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
+
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/reset.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}">
+  {% for t in themes %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/themes/' ~ t ~ '.css') }}">
+  {% endfor %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/onboarding.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/voice.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">
+
+  
+  <meta name="botyaratalk-config"
+        data-lang="{{ lang }}"
+        data-theme="{{ theme }}"
+        data-themes="{{ themes | join(',') }}"
+        data-user="{{ user.username if user else '' }}"
+        data-user-id="{{ user.id if user else '' }}"
+        data-i18n-url="{{ url_for('api.i18n') }}"
+        data-config-url="{{ url_for('api.config') }}"
+        data-ice-url="{{ url_for('auth.ice') }}"
+        data-login-url="{{ url_for('auth.login') }}"
+        data-register-url="{{ url_for('auth.register') }}"
+        data-logout-url="{{ url_for('auth.logout') }}"
+        data-me-url="{{ url_for('auth.me') }}"
+        data-rooms-url="{{ url_for('api.rooms') }}"
+        data-app-url="{{ url_for('pages.app_page') }}"
+        data-auth-url="{{ url_for('pages.auth_page') }}"
+        data-onboarding-url="{{ url_for('pages.onboarding') }}"
+        data-settings-url="{{ url_for('pages.settings_page') }}"
+        data-history-limit="{{ history_limit }}"
+        data-onboarded="{{ '1' if is_onboarded else '0' }}"
+        data-version="1.0.0">
+</head>
+<body class="{% block body_class %}{% endblock %}" data-page="{% block page %}{% endblock %}">
+  {% include "partials/icons.html" %}
+
+  {% block content %}{% endblock %}
+
+  <div class="toast-stack" id="toasts" role="status" aria-live="polite"></div>
+
+  
+  <script src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

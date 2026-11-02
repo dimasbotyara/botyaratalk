@@ -1,0 +1,252 @@
+
+<div class="modal" id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
+  <div class="modal__dialog">
+    <header class="modal__header">
+      <svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg>
+      <h2 class="modal__title" id="settings-title" data-i18n="settings.title">Settings</h2>
+      <button type="button" class="btn btn--icon btn--ghost btn--sm modal__close" id="close-settings" data-close-settings
+              data-i18n-aria-label="a11y.close_settings">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </header>
+
+    <div class="modal__body">
+      <nav class="modal__nav" id="settings-nav" role="tablist" aria-orientation="vertical">
+        <button type="button" class="modal__nav-item" role="tab" data-tab="audio" aria-selected="true">
+          <svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg>
+          <span data-i18n="settings.audio">Audio</span>
+        </button>
+        <button type="button" class="modal__nav-item" role="tab" data-tab="appearance" aria-selected="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-palette"></use></svg>
+          <span data-i18n="settings.appearance">Appearance</span>
+        </button>
+        <button type="button" class="modal__nav-item" role="tab" data-tab="about" aria-selected="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
+          <span data-i18n="settings.about">About</span>
+        </button>
+      </nav>
+
+      <div class="modal__content" id="settings-content">
+
+        
+        <section class="settings-section" role="tabpanel" data-panel="audio">
+          <h3 class="settings-section__title">
+            <svg class="icon" aria-hidden="true"><use href="#i-sliders"></use></svg>
+            <span data-i18n="settings.devices">Devices</span>
+          </h3>
+
+          <div class="settings-row">
+            <label class="settings-row__label" for="sel-mic" data-i18n="settings.mic">Microphone</label>
+            <div class="settings-row__control settings-row__control--wide">
+              <select class="input" id="sel-mic" data-setting="micId">
+                <option value="" data-i18n="settings.default_device">Default</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <label class="settings-row__label" for="sel-camera" data-i18n="settings.camera">Camera</label>
+            <div class="settings-row__control settings-row__control--wide">
+              <select class="input" id="sel-camera" data-setting="cameraId">
+                <option value="" data-i18n="settings.default_device">Default</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="settings-row" id="row-speaker">
+            <label class="settings-row__label" for="sel-speaker" data-i18n="settings.speaker">Speaker</label>
+            <div class="settings-row__control settings-row__control--wide">
+              <select class="input" id="sel-speaker" data-setting="speakerId">
+                <option value="" data-i18n="settings.default_device">Default</option>
+              </select>
+            </div>
+          </div>
+          <p class="settings-hint" id="speaker-unsupported" hidden data-i18n="settings.sink_unsupported"></p>
+          <p class="settings-hint" id="devices-hint" data-i18n="settings.permission_hint"></p>
+
+          <h3 class="settings-section__title">
+            <svg class="icon" aria-hidden="true"><use href="#i-volume"></use></svg>
+            <span data-i18n="settings.audio">Audio</span>
+          </h3>
+
+          <div class="settings-row settings-row--stacked">
+            <div class="settings-row">
+              <label class="settings-row__label" for="range-mic" data-i18n="settings.mic_volume">Microphone volume</label>
+              <div class="settings-row__control">
+                <input class="slider" type="range" id="range-mic" min="0" max="200" step="5"
+                       value="100" data-setting="micGain">
+                <output class="slider__value" for="range-mic" id="range-mic-value">100%</output>
+              </div>
+            </div>
+            <span class="settings-hint" data-i18n="settings.volume_hint">0–200%</span>
+          </div>
+
+          <div class="settings-row">
+            <label class="settings-row__label" for="range-output" data-i18n="settings.output_volume">Output volume</label>
+            <div class="settings-row__control">
+              <input class="slider" type="range" id="range-output" min="0" max="100" step="5"
+                     value="100" data-setting="outputVolume">
+              <output class="slider__value" for="range-output" id="range-output-value">100%</output>
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <span class="settings-row__label" data-i18n="settings.noise">Noise suppression</span>
+            <div class="settings-row__control">
+              <label class="switch">
+                <input type="checkbox" id="chk-noise" data-setting="noiseSuppression" checked>
+                <span class="switch__track" aria-hidden="true"></span>
+                <span data-i18n="settings.noise_native">Native</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <span class="settings-row__label" data-i18n="settings.rnnoise">Enhanced (RNNoise)</span>
+            <div class="settings-row__control">
+              <label class="switch">
+                <input type="checkbox" id="chk-rnnoise" data-setting="noiseMode">
+                <span class="switch__track" aria-hidden="true"></span>
+              </label>
+            </div>
+          </div>
+          <p class="settings-hint" id="rnnoise-hint" data-i18n="settings.rnnoise_hint">RNNoise hint</p>
+
+          <div class="settings-row">
+            <span class="settings-row__label" data-i18n="settings.echo_cancellation">Echo cancellation</span>
+            <div class="settings-row__control">
+              <label class="switch">
+                <input type="checkbox" id="chk-echo" data-setting="echoCancellation" checked>
+                <span class="switch__track" aria-hidden="true"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <span class="settings-row__label" data-i18n="settings.auto_gain">Auto gain</span>
+            <div class="settings-row__control">
+              <label class="switch">
+                <input type="checkbox" id="chk-agc" data-setting="autoGainControl" checked>
+                <span class="switch__track" aria-hidden="true"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="mic-test">
+            <div class="settings-row">
+              <span class="settings-row__label" data-i18n="settings.level">Signal level</span>
+              <div class="settings-row__control">
+                <button type="button" class="btn btn--ghost btn--sm" id="test-mic" aria-pressed="false">
+                  <svg class="icon" aria-hidden="true"><use href="#i-headphones"></use></svg>
+                  <span data-monitor-label data-i18n="settings.test_mic">Test microphone</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="vu-wrap">
+              <div class="vu" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="vu-meter">
+                <div class="vu__fill" id="vu-fill"></div>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <span class="settings-row__label" data-i18n="settings.self_monitor">Listen to myself</span>
+              <div class="settings-row__control">
+                <label class="switch">
+                  <input type="checkbox" id="chk-monitor" data-setting="selfMonitor">
+                  <span class="switch__track" aria-hidden="true"></span>
+                </label>
+              </div>
+            </div>
+            <span class="settings-hint" data-i18n="settings.self_monitor_hint">Only you hear it</span>
+            <span class="settings-hint" id="monitor-hint" data-i18n="settings.monitor_in_call" hidden></span>
+          </div>
+
+          <div class="settings-actions">
+            <button type="button" class="btn btn--ghost btn--sm" id="reset-settings">
+              <svg class="icon" aria-hidden="true"><use href="#i-reset"></use></svg>
+              <span data-i18n="settings.reset">Reset settings</span>
+            </button>
+          </div>
+        </section>
+
+        
+        <section class="settings-section" role="tabpanel" data-panel="appearance" hidden>
+          <h3 class="settings-section__title">
+            <svg class="icon" aria-hidden="true"><use href="#i-globe"></use></svg>
+            <span data-i18n="settings.language">Interface language</span>
+          </h3>
+
+          <div class="settings-row">
+            <span class="settings-row__label" data-i18n="settings.language_hint">Updates without reload</span>
+            <div class="settings-row__control">
+              <div class="auth-tabs" id="lang-switch" role="tablist">
+                <button type="button" class="auth-tabs__btn" role="tab" data-lang-option="ru"
+                        aria-selected="false">Русский</button>
+                <button type="button" class="auth-tabs__btn" role="tab" data-lang-option="en"
+                        aria-selected="true">English</button>
+              </div>
+            </div>
+          </div>
+
+          <h3 class="settings-section__title">
+            <svg class="icon" aria-hidden="true"><use href="#i-palette"></use></svg>
+            <span data-i18n="settings.theme">Theme</span>
+          </h3>
+
+          <div class="settings-theme-grid theme-grid" id="settings-theme-grid">
+            
+          </div>
+        </section>
+
+        
+        <section class="settings-section" role="tabpanel" data-panel="about" hidden>
+          <h3 class="settings-section__title">
+            <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
+            <span data-i18n="settings.about">About</span>
+          </h3>
+
+          <div class="settings-account">
+            <span class="avatar avatar--lg" id="settings-avatar">?</span>
+            <div>
+              <div class="settings-account__name" id="settings-username">—</div>
+              <div class="settings-hint" data-i18n="settings.account">Account</div>
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <span class="settings-row__label" data-i18n="settings.server">Server</span>
+            <div class="settings-row__control">
+              <span class="badge" id="settings-server">—</span>
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <span class="settings-row__label" data-i18n="settings.connection">Connection</span>
+            <div class="settings-row__control">
+              <span class="badge" id="settings-connection">—</span>
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <span class="settings-row__label" data-i18n="settings.version">Version</span>
+            <div class="settings-row__control">
+              <span class="badge">botyaratalk 1.0.0</span>
+            </div>
+          </div>
+
+          <p class="settings-hint" data-i18n="settings.voice_limits"
+             data-i18n-params='{"max": 8}'>Up to 8 participants</p>
+
+          <div class="settings-actions">
+            <button type="button" class="btn btn--danger btn--sm" id="settings-logout">
+              <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
+              <span data-i18n="settings.logout">Sign out</span>
+            </button>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+</div>

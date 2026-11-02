@@ -1,0 +1,16 @@
+{
+  "name": "botyaratalk",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LAN messenger with voice, video and screen sharing — frontend dependencies",
+  "comment": "npm-зависимостей нет: Socket.IO-клиент и RNNoise лежат локально в static/vendor (см. DECISIONS.md §6.1). Файл нужен для npm-инструментов (prettier/eslint) и для make-подобных скриптов.",
+  "scripts": {
+    "serve": "python3 run.py",
+    "test": "python3 -m pytest tests/ -q",
+    "screenshots": "python3 scripts/take_screenshots.py"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18"
+  }
+}

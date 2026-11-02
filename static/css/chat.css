@@ -1,0 +1,252 @@
+/* Текстовый канал: лента сообщений и композер. */
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.chat__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-5) var(--space-5) var(--space-3);
+  overflow-anchor: auto;
+}
+
+.chat__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.chat__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 100%;
+  min-height: 220px;
+  color: var(--fg-subtle);
+  text-align: center;
+}
+
+.chat__empty-icon {
+  width: 46px;
+  height: 46px;
+  color: var(--border-strong);
+}
+
+.chat__empty-title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+
+/* --- разделитель дат ------------------------------------------------- */
+.chat__day {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 var(--space-2);
+  color: var(--fg-subtle);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.chat__day::before,
+.chat__day::after {
+  content: "";
+  height: 1px;
+  flex: 1 1 auto;
+  background: var(--border);
+}
+
+/* --- сообщение ------------------------------------------------------- */
+.msg {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  transition: background var(--t-fast);
+}
+
+.msg:hover {
+  background: color-mix(in srgb, var(--hover) 60%, transparent);
+}
+
+.msg--grouped {
+  padding-top: 0;
+}
+
+.msg--own .msg__author {
+  color: var(--accent);
+}
+
+.msg__gutter {
+  display: flex;
+  justify-content: center;
+}
+
+.msg__time-inline {
+  opacity: 0;
+  font-size: 10px;
+  color: var(--fg-subtle);
+  transition: opacity var(--t-fast);
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+.msg:hover .msg__time-inline {
+  opacity: 1;
+}
+
+.msg__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: 1px;
+}
+
+.msg__author {
+  font-weight: 700;
+  font-size: var(--fs-base);
+}
+
+.msg__time {
+  font-size: var(--fs-xs);
+  color: var(--fg-subtle);
+}
+
+.msg__text {
+  font-size: var(--fs-md);
+  line-height: var(--lh-relaxed);
+  color: var(--fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* --- композер -------------------------------------------------------- */
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5) var(--space-5);
+  border-top: 1px solid var(--border);
+  background: var(--bg-alt);
+}
+
+.composer__box {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--bg-inset);
+  transition: border-color var(--t-fast);
+}
+
+.composer__box:focus-within {
+  border-color: var(--accent);
+}
+
+.composer__input {
+  flex: 1 1 auto;
+  resize: none;
+  max-height: 180px;
+  min-height: 24px;
+  padding: var(--space-1) 0;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font-size: var(--fs-md);
+  line-height: var(--lh-normal);
+  outline: none;
+}
+
+.composer__input::placeholder {
+  color: var(--fg-subtle);
+}
+
+.composer__send {
+  flex: 0 0 auto;
+}
+
+.composer__hint {
+  align-self: center;
+  font-size: var(--fs-xs);
+  color: var(--fg-subtle);
+  padding-bottom: var(--space-2);
+  min-height: 1em;
+}
+
+.composer__counter {
+  font-size: var(--fs-xs);
+  color: var(--fg-subtle);
+  padding-bottom: var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.composer__counter[data-state="warn"] {
+  color: var(--warning);
+}
+
+.composer__counter[data-state="danger"] {
+  color: var(--danger);
+}
+
+.composer[data-disabled="true"] {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* --- индикатор «печатает…» ------------------------------------------ */
+.typing {
+  height: 18px;
+  padding: 0 var(--space-5);
+  font-size: var(--fs-xs);
+  color: var(--fg-subtle);
+  font-style: italic;
+  overflow: hidden;
+}
+
+/* --- плейсхолдер «комната не выбрана» ------------------------------- */
+.room-placeholder {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  color: var(--fg-subtle);
+  text-align: center;
+  padding: var(--space-6);
+}
+
+.room-placeholder__icon {
+  width: 64px;
+  height: 64px;
+  color: var(--border-strong);
+}
+
+.room-placeholder__title {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  color: var(--fg-muted);
+}
+
+@media (max-width: 768px) {
+  .chat__scroll {
+    padding: var(--space-3);
+  }
+
+  .composer {
+    padding: var(--space-2) var(--space-3) var(--space-3);
+  }
+}

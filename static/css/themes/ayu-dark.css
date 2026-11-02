@@ -1,0 +1,50 @@
+/* Тема Ayu Dark — dark
+   Палитра: Ayu. Значения цветов взяты из официальной палитры темы.
+   Селектор работает и для <html>, и для вложенных превью-карточек. */
+
+[data-theme="ayu-dark"] {
+  color-scheme: dark;
+
+  /* --- сырая палитра ------------------------------------------------ */
+  --raw-base: #0b0e14;
+  --raw-mantle: #0f131a;
+  --raw-crust: #060a10;
+  --raw-text: #b3b1ad;
+  --raw-subtext: #8f9399;
+  --raw-overlay: #5c6773;
+  --raw-surface2: #2a3140;
+  --raw-surface1: #20252f;
+  --raw-surface0: #171b22;
+  --raw-accent: #e6b450;
+  --raw-red: #f07178;
+  --raw-green: #c2d94c;
+  --raw-yellow: #ffb454;
+  --raw-blue: #59c2ff;
+  --raw-peach: #ff8f40;
+  --raw-mauve: #d2a6ff;
+
+  /* --- семантика (обязательный минимум) ----------------------------- */
+  --bg: var(--raw-base);
+  --bg-alt: var(--raw-mantle);
+  --bg-elevated: #131721;
+  --bg-inset: var(--raw-crust);
+  --fg: var(--raw-text);
+  --fg-muted: #8f9399;
+  --fg-subtle: var(--raw-overlay);
+  --accent: var(--raw-accent);
+  --accent-fg: #0b0e14;
+  --accent-soft: rgba(230, 180, 80, 0.14);
+  --border: #20252f;
+  --border-strong: #2a3140;
+  --danger: #f07178;
+  --success: var(--raw-green);
+  --warning: #e6b450;
+  --hover: #161b26;
+  --active: rgba(230, 180, 80, 0.16);
+  --selection: rgba(230, 180, 80, 0.24);
+  --scrollbar: #2a3140;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --overlay: rgba(0, 0, 0, 0.62);
+  --bubble-own: rgba(230, 180, 80, 0.12);
+  --bubble-own-fg: #b3b1ad;
+}

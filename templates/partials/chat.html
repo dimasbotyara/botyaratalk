@@ -1,0 +1,49 @@
+
+<section class="chat" id="chat" hidden aria-labelledby="room-title">
+  <header class="room-header">
+    <svg class="room-header__icon" aria-hidden="true"><use href="#i-hash"></use></svg>
+    <div>
+      <h1 class="room-header__title" id="room-title">—</h1>
+      <div class="room-header__meta" data-i18n="room.text_channel">Text channel</div>
+    </div>
+
+    <div class="room-header__actions">
+      <span class="voice-pill" id="voice-pill" hidden>
+        <span class="voice-pill__dot" aria-hidden="true"></span>
+        <span data-i18n="voice.connected">In the voice channel</span>
+      </span>
+
+      <button type="button" class="btn btn--icon btn--ghost" id="toggle-voice-panel"
+              data-i18n-aria-label="room.voice_channel" data-i18n-title="room.voice_channel">
+        <svg class="icon" aria-hidden="true"><use href="#i-headphones"></use></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="chat__scroll" id="chat-scroll">
+    <div class="chat__list" id="chat-list" role="log" aria-live="polite" aria-relevant="additions">
+      
+    </div>
+
+    <div class="chat__empty" id="chat-empty" hidden>
+      <svg class="chat__empty-icon" aria-hidden="true"><use href="#i-sparkles"></use></svg>
+      <span class="chat__empty-title" data-i18n="chat.empty">Nothing here yet</span>
+      <span data-i18n="chat.empty_hint">Write the first message in this room</span>
+    </div>
+  </div>
+
+  <div class="typing" id="typing-indicator" aria-live="polite"></div>
+
+  <form class="composer" id="composer" autocomplete="off">
+    <div class="composer__box">
+      <textarea class="composer__input" id="composer-input" rows="1" maxlength="{{ 2000 }}"
+                data-i18n-placeholder="chat.placeholder" data-i18n-aria-label="a11y.message_input"
+                data-i18n-params='{{ {"room": ""} | tojson }}'></textarea>
+      <span class="composer__counter" id="composer-counter" hidden></span>
+      <button type="submit" class="btn btn--primary btn--icon btn--sm composer__send" id="composer-send"
+              data-i18n-aria-label="chat.send" data-i18n-title="chat.send">
+        <svg class="icon" aria-hidden="true"><use href="#i-send"></use></svg>
+      </button>
+    </div>
+  </form>
+</section>

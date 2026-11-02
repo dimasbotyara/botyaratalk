@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block page %}auth{% endblock %}
+{% block body_class %}page-auth{% endblock %}
+{% block title %}botyaratalk — {{ translations['auth.login'] }}{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+
+  <aside class="auth-aside">
+    <span class="auth-aside__glow" aria-hidden="true"></span>
+
+    <div class="auth-aside__brand">
+      <svg class="auth-aside__logo" aria-hidden="true"><use href="#i-logo"></use></svg>
+      <span>botyaratalk</span>
+    </div>
+
+    <div>
+      <p class="auth-aside__tagline" data-i18n="app.tagline">A messenger for your local network</p>
+      <div class="auth-aside__features">
+        <span class="auth-aside__feature">
+          <svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg>
+          <span data-i18n="voice.join">Join voice</span>
+        </span>
+        <span class="auth-aside__feature">
+          <svg class="icon" aria-hidden="true"><use href="#i-screen"></use></svg>
+          <span data-i18n="voice.screen_start">Share screen</span>
+        </span>
+        <span class="auth-aside__feature">
+          <svg class="icon" aria-hidden="true"><use href="#i-globe"></use></svg>
+          <span data-i18n="settings.language">Interface language</span>
+        </span>
+        <span class="auth-aside__feature">
+          <svg class="icon" aria-hidden="true"><use href="#i-palette"></use></svg>
+          <span data-i18n="settings.theme">Theme</span>
+        </span>
+      </div>
+    </div>
+
+    <p class="auth-aside__footer">botyaratalk · LAN</p>
+  </aside>
+
+  <main class="auth-main">
+    <div class="auth-card">
+      <h1 class="auth-card__title" data-i18n="auth.title">Welcome back</h1>
+      <p class="auth-card__subtitle" data-i18n="auth.subtitle">Sign in to keep chatting</p>
+
+      <div class="auth-tabs" role="tablist" aria-label="Auth mode">
+        <button type="button" class="auth-tabs__btn" role="tab" data-mode="login"
+                aria-selected="true" data-i18n="auth.login">Sign in</button>
+        <button type="button" class="auth-tabs__btn" role="tab" data-mode="register"
+                aria-selected="false" data-i18n="auth.register">Sign up</button>
+      </div>
+
+      <form class="auth-form" id="auth-form" data-mode="login" novalidate>
+        <div class="field">
+          <label class="field__label" for="auth-username" data-i18n="auth.username">Nickname</label>
+          <input class="input" id="auth-username" name="username" type="text" autocomplete="username"
+                 required minlength="3" maxlength="32" data-i18n-placeholder="auth.username_placeholder">
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="auth-password" data-i18n="auth.password">Password</label>
+          <input class="input" id="auth-password" name="password" type="password"
+                 autocomplete="current-password" required minlength="6"
+                 data-i18n-placeholder="auth.password_placeholder">
+        </div>
+
+        <div class="field" id="auth-password2-field" hidden>
+          <label class="field__label" for="auth-password2" data-i18n="auth.password2">Repeat password</label>
+          <input class="input" id="auth-password2" name="password2" type="password"
+                 autocomplete="new-password" minlength="6">
+        </div>
+
+        <p class="auth-form__error" id="auth-error" role="alert" aria-live="assertive"></p>
+
+        <button type="submit" class="btn btn--primary btn--block" id="auth-submit">
+          <span data-i18n="auth.submit_login">Sign in</span>
+        </button>
+      </form>
+
+      <div class="auth-switch">
+        <span data-i18n="auth.no_account">No account yet?</span>
+        <button type="button" class="auth-switch__link" data-switch-mode="register"
+                data-i18n="auth.to_register">Sign up</button>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{{ url_for('static', filename='js/auth.js') }}"></script>
+{% endblock %}

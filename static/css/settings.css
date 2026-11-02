@@ -1,0 +1,484 @@
+/* Настройки: модалка (из /app) и отдельная страница (/settings). */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  background: var(--overlay);
+  backdrop-filter: blur(2px);
+  animation: modal-fade var(--t-base) both;
+}
+
+.modal[hidden] {
+  display: none;
+}
+
+@keyframes modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal__dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(920px, 100%);
+  max-height: min(84dvh, 760px);
+  border-radius: var(--radius-xl);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  animation: modal-pop var(--t-slow) both;
+}
+
+@keyframes modal-pop {
+  from { opacity: 0; transform: translateY(12px) scale(0.99); }
+  to { opacity: 1; transform: none; }
+}
+
+.modal__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-alt);
+}
+
+.modal__title {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+}
+
+.modal__close {
+  margin-left: auto;
+}
+
+.modal__body {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.modal__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3);
+  border-right: 1px solid var(--border);
+  background: var(--bg-alt);
+  overflow-y: auto;
+}
+
+.modal__nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--fg-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-align: left;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+
+.modal__nav-item:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+.modal__nav-item[aria-selected="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.modal__nav-item .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.modal__content {
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* Секции настроек */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.settings-section[hidden] {
+  display: none;
+}
+
+.settings-section__title {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-section__title .icon {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 32px;
+}
+
+.settings-row--stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.settings-row__label {
+  flex: 1 1 auto;
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+  min-width: 0;
+}
+
+.settings-row__control {
+  flex: 0 0 220px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.settings-row__control--wide {
+  flex-basis: 320px;
+}
+
+.settings-row select.input {
+  min-height: var(--control-h-sm);
+  font-size: var(--fs-sm);
+}
+
+.settings-hint {
+  font-size: var(--fs-xs);
+  color: var(--fg-subtle);
+  line-height: var(--lh-normal);
+}
+
+/* Переключатель */
+.switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--fs-sm);
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.switch__track {
+  width: 40px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--border);
+  transition: background var(--t-base);
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.switch__track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bg);
+  transition: transform var(--t-base), background var(--t-base);
+}
+
+.switch input:checked + .switch__track {
+  background: var(--accent);
+}
+
+.switch input:checked + .switch__track::after {
+  transform: translateX(18px);
+  background: var(--accent-fg);
+}
+
+.switch input:focus-visible + .switch__track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Ползунок */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.slider::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: 99px;
+  background: var(--border);
+}
+
+.slider::-moz-range-track {
+  height: 5px;
+  border-radius: 99px;
+  background: var(--border);
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5.5px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.slider__value {
+  min-width: 44px;
+  text-align: right;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-muted);
+}
+
+/* VU-метр */
+.vu {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.vu__fill {
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--success), var(--warning) 70%, var(--danger));
+  transition: width 60ms linear;
+}
+
+.vu-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.mic-test {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+}
+
+/* Сетка тем в настройках — те же карточки, что в онбординге, но мельче */
+.settings-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: var(--space-3);
+}
+
+.settings-theme-grid .theme-card__preview {
+  height: 76px;
+}
+
+.settings-theme-grid .theme-card {
+  padding: 6px;
+}
+
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.settings-account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.settings-account__name {
+  font-weight: 700;
+  font-size: var(--fs-md);
+}
+
+/* Страница /settings — та же модалка, но развёрнутая на весь экран */
+.settings-page {
+  min-height: 100dvh;
+  padding: var(--space-6);
+  background: var(--bg);
+  display: flex;
+  justify-content: center;
+}
+
+.settings-page .modal__dialog {
+  max-height: none;
+  width: min(960px, 100%);
+}
+
+/* ---------- Мобильные экраны ---------- */
+@media (max-width: 780px) {
+  .modal {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .modal__dialog {
+    width: 100%;
+    max-height: 92dvh;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    border-bottom: none;
+  }
+
+  .modal__body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .modal__nav {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: var(--space-2);
+    scrollbar-width: none;
+  }
+
+  .modal__nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .modal__nav-item {
+    flex: 0 0 auto;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .modal__content {
+    padding: var(--space-4);
+    gap: var(--space-5);
+  }
+
+  .settings-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .settings-row--stacked .settings-row {
+    gap: var(--space-1);
+  }
+
+  .settings-row__control {
+    flex-basis: auto;
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .settings-row select.input {
+    width: 100%;
+  }
+
+  .slider {
+    flex: 1 1 auto;
+  }
+
+  .settings-theme-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+
+  .mic-test {
+    padding: var(--space-3);
+  }
+}
+
+@media (max-width: 480px) {
+  .modal__dialog {
+    max-height: 95dvh;
+  }
+
+  .modal__header {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .settings-theme-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Блокируем прокрутку фона, пока открыта модалка */
+body.modal-open {
+  overflow: hidden;
+}
+
+/* Недоступное действие: кнопка теста микрофона во время звонка */
+.btn[disabled] .icon,
+.btn[disabled] span {
+  opacity: 0.7;
+}
+
+.settings-hint--warning {
+  color: var(--warning);
+}
+
+/* Выключенный переключатель (например, self-monitor во время звонка) */
+.switch--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.switch--disabled .switch__track::after {
+  background: var(--fg-subtle);
+}

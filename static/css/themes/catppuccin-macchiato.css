@@ -1,0 +1,50 @@
+/* Тема Catppuccin Macchiato — dark
+   Палитра: Catppuccin. Значения цветов взяты из официальной палитры темы.
+   Селектор работает и для <html>, и для вложенных превью-карточек. */
+
+[data-theme="catppuccin-macchiato"] {
+  color-scheme: dark;
+
+  /* --- сырая палитра ------------------------------------------------ */
+  --raw-base: #24273a;
+  --raw-mantle: #1e2030;
+  --raw-crust: #181926;
+  --raw-text: #cad3f5;
+  --raw-subtext: #a5adcb;
+  --raw-overlay: #6e738d;
+  --raw-surface2: #5b6078;
+  --raw-surface1: #494d64;
+  --raw-surface0: #363a4f;
+  --raw-accent: #c6a0f6;
+  --raw-red: #ed8796;
+  --raw-green: #a6da95;
+  --raw-yellow: #eed49f;
+  --raw-blue: #8aadf4;
+  --raw-peach: #f5a97f;
+  --raw-mauve: #c6a0f6;
+
+  /* --- семантика (обязательный минимум) ----------------------------- */
+  --bg: var(--raw-base);
+  --bg-alt: var(--raw-mantle);
+  --bg-elevated: #2b2f45;
+  --bg-inset: var(--raw-crust);
+  --fg: var(--raw-text);
+  --fg-muted: #a5adcb;
+  --fg-subtle: var(--raw-overlay);
+  --accent: var(--raw-accent);
+  --accent-fg: #181926;
+  --accent-soft: rgba(198, 160, 246, 0.16);
+  --border: #363a4f;
+  --border-strong: #494d64;
+  --danger: #ed8796;
+  --success: var(--raw-green);
+  --warning: #eed49f;
+  --hover: #2b2f45;
+  --active: rgba(198, 160, 246, 0.18);
+  --selection: rgba(198, 160, 246, 0.28);
+  --scrollbar: #494d64;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.38);
+  --overlay: rgba(0, 0, 0, 0.55);
+  --bubble-own: rgba(198, 160, 246, 0.16);
+  --bubble-own-fg: #cad3f5;
+}

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block page %}onboarding{% endblock %}
+{% block body_class %}page-onboarding{% endblock %}
+{% block title %}botyaratalk — onboarding{% endblock %}
+
+{% block content %}
+<div class="onboarding" id="onboarding" data-step="lang">
+
+  <header class="onboarding__header">
+    <div class="onboarding__brand">
+      <svg class="onboarding__logo" aria-hidden="true"><use href="#i-logo"></use></svg>
+      <span>botyaratalk</span>
+    </div>
+
+    <div class="onboarding__steps" role="list" aria-label="Wizard steps">
+      <span class="step-dot" role="listitem" data-step-dot="lang" data-state="active">
+        <span class="step-dot__num">1</span>
+        <span data-i18n="onboarding.lang.title">Language</span>
+      </span>
+      <span class="step-dot" role="listitem" data-step-dot="theme" data-state="upcoming">
+        <span class="step-dot__num">2</span>
+        <span data-i18n="onboarding.theme.title">Theme</span>
+      </span>
+      <span class="step-dot" role="listitem" data-step-dot="register" data-state="upcoming">
+        <span class="step-dot__num">3</span>
+        <span data-i18n="auth.register">Sign up</span>
+      </span>
+    </div>
+  </header>
+
+  <main class="onboarding__main">
+
+    {# ---------- Step 1: language ---------- #}
+    <section class="onboarding__panel" data-panel="lang" aria-labelledby="ob-lang-title">
+      <h1 class="onboarding__title" id="ob-lang-title" data-i18n="onboarding.lang.title">Choose your language</h1>
+      <p class="onboarding__subtitle" data-i18n="onboarding.lang.subtitle">You can switch it later.</p>
+
+      <div class="lang-grid" role="group" aria-labelledby="ob-lang-title">
+        <button type="button" class="lang-card" data-lang-choice="ru" aria-pressed="false">
+          <span class="lang-card__flag" aria-hidden="true">RU</span>
+          <span>
+            <span class="lang-card__name">Русский</span>
+            <span class="lang-card__native" data-i18n="lang.ru.native">Russian</span>
+          </span>
+        </button>
+
+        <button type="button" class="lang-card" data-lang-choice="en" aria-pressed="false">
+          <span class="lang-card__flag" aria-hidden="true">EN</span>
+          <span>
+            <span class="lang-card__name">English</span>
+            <span class="lang-card__native" data-i18n="lang.en.native">English language</span>
+          </span>
+        </button>
+      </div>
+
+      <div class="onboarding__footer">
+        <span class="onboarding__hint" data-i18n="common.step" data-i18n-params='{"current": 1, "total": 3}'>Step 1 of 3</span>
+        <div class="onboarding__footer-right">
+          <button type="button" class="btn btn--primary" data-action="next" data-from="lang">
+            <span data-i18n="common.next">Next</span>
+            <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    {# ---------- Step 2: theme ---------- #}
+    <section class="onboarding__panel" data-panel="theme" aria-labelledby="ob-theme-title" hidden>
+      <h1 class="onboarding__title" id="ob-theme-title" data-i18n="onboarding.theme.title">Choose a theme</h1>
+      <p class="onboarding__subtitle" data-i18n="onboarding.theme.subtitle">Click to preview.</p>
+
+      {# Карточки тем рендерит onboarding.js — список тем приходит из meta-тега #}
+      <div class="theme-groups" id="theme-groups"></div>
+
+      <div class="onboarding__footer">
+        <button type="button" class="btn btn--ghost" data-action="back" data-to="lang">
+          <svg class="icon" aria-hidden="true"><use href="#i-arrow-left"></use></svg>
+          <span data-i18n="common.back">Back</span>
+        </button>
+        <div class="onboarding__footer-right">
+          <span class="onboarding__hint" data-i18n="onboarding.theme.hint">Applies to the whole app</span>
+          <button type="button" class="btn btn--ghost" id="apply-theme" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>
+            <span data-i18n="common.apply">Apply</span>
+          </button>
+          <button type="button" class="btn btn--primary" data-action="next" data-from="theme">
+            <span data-i18n="common.next">Next</span>
+            <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    {# ---------- Step 3: sign up ---------- #}
+    <section class="onboarding__panel" data-panel="register" aria-labelledby="ob-register-title" hidden>
+      <h1 class="onboarding__title" id="ob-register-title" data-i18n="onboarding.register.title">Create your account</h1>
+      <p class="onboarding__subtitle" data-i18n="onboarding.register.subtitle">Local account.</p>
+
+      <div class="register-layout">
+        <form class="register-form" id="onboarding-form" novalidate>
+          <div class="field">
+            <label class="field__label" for="ob-username" data-i18n="auth.username">Nickname</label>
+            <input class="input" id="ob-username" name="username" type="text" autocomplete="username"
+                   minlength="3" maxlength="32" required data-i18n-placeholder="auth.username_placeholder">
+            <span class="field__hint" data-i18n="auth.err_username">3–32 characters</span>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="ob-password" data-i18n="auth.password">Password</label>
+            <input class="input" id="ob-password" name="password" type="password" autocomplete="new-password"
+                   minlength="6" required data-i18n-placeholder="auth.password_placeholder">
+            <div class="password-meter" aria-hidden="true">
+              <span class="password-meter__bar"></span>
+              <span class="password-meter__bar"></span>
+              <span class="password-meter__bar"></span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="ob-password2" data-i18n="auth.password2">Repeat password</label>
+            <input class="input" id="ob-password2" name="password2" type="password" autocomplete="new-password"
+                   minlength="6" required>
+          </div>
+
+          <p class="auth-form__error" id="ob-error" role="alert" aria-live="assertive"></p>
+
+          <div class="onboarding__footer">
+            <button type="button" class="btn btn--ghost" data-action="back" data-to="theme">
+              <svg class="icon" aria-hidden="true"><use href="#i-arrow-left"></use></svg>
+              <span data-i18n="common.back">Back</span>
+            </button>
+            <button type="submit" class="btn btn--primary" id="ob-submit">
+              <svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>
+              <span data-i18n="onboarding.register.action">Create and sign in</span>
+            </button>
+          </div>
+        </form>
+
+        <aside class="register-preview" aria-hidden="true">
+          <span class="register-preview__title" data-i18n="onboarding.welcome">Welcome</span>
+          <div class="register-preview__row">
+            <span class="avatar avatar--lg" id="ob-preview-avatar">?</span>
+            <span class="register-preview__name" id="ob-preview-name">—</span>
+          </div>
+          <span class="register-preview__note" data-i18n="onboarding.register.subtitle">Local account.</span>
+          <span class="badge badge--accent">
+            <svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg>
+            <span>LAN</span>
+          </span>
+        </aside>
+      </div>
+    </section>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{{ url_for('static', filename='js/onboarding.js') }}"></script>
+{% endblock %}

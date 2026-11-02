@@ -1,0 +1,61 @@
+{# Voice channel panel: join button, participant tiles, controls. #}
+<aside class="voice-panel" id="voice-panel" data-open="false" aria-labelledby="voice-panel-title">
+  <header class="voice-panel__header">
+    <svg class="icon" aria-hidden="true"><use href="#i-headphones"></use></svg>
+    <span class="voice-panel__title" id="voice-panel-title" data-i18n="room.voice_channel">Voice channel</span>
+    <span class="badge voice-panel__count" id="voice-count" hidden>0</span>
+    <button type="button" class="btn btn--icon btn--ghost btn--sm" id="close-voice-panel"
+            data-i18n-aria-label="common.close">
+      <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+    </button>
+  </header>
+
+  <div class="voice-warning" id="voice-secure-warning" hidden>
+    <svg class="icon" aria-hidden="true"><use href="#i-warning"></use></svg>
+    <span data-i18n="voice.secure_context">Calls need HTTPS or localhost</span>
+  </div>
+
+  <div class="voice-panel__join" id="voice-join-block">
+    <button type="button" class="btn btn--primary btn--block" id="voice-join">
+      <svg class="icon" aria-hidden="true"><use href="#i-headphones"></use></svg>
+      <span data-i18n="voice.join">Join voice</span>
+    </button>
+    <span class="settings-hint" data-i18n="voice.join_hint">Your mic goes live right away</span>
+  </div>
+
+  <div class="voice-panel__body" id="voice-body" hidden>
+    <div class="voice-grid" id="voice-grid" data-count="1">
+      <!-- Participant tiles are rendered by voice.js -->
+    </div>
+  </div>
+
+  <div class="voice-list" id="voice-list" aria-live="polite"></div>
+
+  <div class="voice-controls" id="voice-controls" hidden>
+    <button type="button" class="ctrl-btn" id="btn-mute" aria-pressed="false"
+            data-i18n-aria-label="voice.mute" data-i18n-title="voice.mute">
+      <svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg>
+    </button>
+
+    <button type="button" class="ctrl-btn" id="btn-camera" aria-pressed="false"
+            data-i18n-aria-label="voice.camera_on" data-i18n-title="voice.camera_on">
+      <svg class="icon" aria-hidden="true"><use href="#i-camera"></use></svg>
+    </button>
+
+    <button type="button" class="ctrl-btn" id="btn-screen" aria-pressed="false"
+            data-i18n-aria-label="voice.screen_start" data-i18n-title="voice.screen_start">
+      <svg class="icon" aria-hidden="true"><use href="#i-screen"></use></svg>
+    </button>
+
+    <button type="button" class="ctrl-btn ctrl-btn--danger ctrl-btn--wide" id="btn-leave"
+            data-i18n-aria-label="voice.leave" data-i18n-title="voice.leave">
+      <svg class="icon" aria-hidden="true"><use href="#i-phone-off"></use></svg>
+      <span data-i18n="voice.leave">Disconnect</span>
+    </button>
+  </div>
+
+  <div class="voice-status" id="voice-status" data-state="idle">
+    <span class="voice-status__dot" aria-hidden="true"></span>
+    <span id="voice-status-text" data-i18n="voice.not_connected">Not connected</span>
+  </div>
+</aside>

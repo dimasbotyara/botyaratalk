@@ -1,0 +1,51 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# --- виртуальные окружения ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- botyaratalk: локальные данные ---
+instance/
+!instance/.gitkeep
+*.db
+*.db-wal
+*.db-shm
+secret.key
+
+# --- тесты, покрытие, кеши ---
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# --- Node ---
+node_modules/
+npm-debug.log*
+
+# --- редакторы и ОС ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- прочее ---
+.env
+.env.*
+*.log
+key.pem
+cert.pem
+*.pem

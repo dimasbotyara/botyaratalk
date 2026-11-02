@@ -1,0 +1,50 @@
+/* Тема Catppuccin Frappé — dark
+   Палитра: Catppuccin. Значения цветов взяты из официальной палитры темы.
+   Селектор работает и для <html>, и для вложенных превью-карточек. */
+
+[data-theme="catppuccin-frappe"] {
+  color-scheme: dark;
+
+  /* --- сырая палитра ------------------------------------------------ */
+  --raw-base: #303446;
+  --raw-mantle: #292c3c;
+  --raw-crust: #232634;
+  --raw-text: #c6d0f5;
+  --raw-subtext: #a5adce;
+  --raw-overlay: #737994;
+  --raw-surface2: #626880;
+  --raw-surface1: #51576d;
+  --raw-surface0: #414559;
+  --raw-accent: #ca9ee6;
+  --raw-red: #e78284;
+  --raw-green: #a6d189;
+  --raw-yellow: #e5c890;
+  --raw-blue: #8caaee;
+  --raw-peach: #ef9f76;
+  --raw-mauve: #ca9ee6;
+
+  /* --- семантика (обязательный минимум) ----------------------------- */
+  --bg: var(--raw-base);
+  --bg-alt: var(--raw-mantle);
+  --bg-elevated: #353a4f;
+  --bg-inset: var(--raw-crust);
+  --fg: var(--raw-text);
+  --fg-muted: #a5adce;
+  --fg-subtle: var(--raw-overlay);
+  --accent: var(--raw-accent);
+  --accent-fg: #232634;
+  --accent-soft: rgba(202, 158, 230, 0.16);
+  --border: #414559;
+  --border-strong: #51576d;
+  --danger: #e78284;
+  --success: var(--raw-green);
+  --warning: #e5c890;
+  --hover: #353a4f;
+  --active: rgba(202, 158, 230, 0.18);
+  --selection: rgba(202, 158, 230, 0.28);
+  --scrollbar: #51576d;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --overlay: rgba(0, 0, 0, 0.55);
+  --bubble-own: rgba(202, 158, 230, 0.16);
+  --bubble-own-fg: #c6d0f5;
+}

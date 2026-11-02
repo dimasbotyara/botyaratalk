@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block page %}app{% endblock %}
+{% block body_class %}page-app{% endblock %}
+{% block title %}botyaratalk{% endblock %}
+
+{% block content %}
+<div class="app-shell" id="app-shell" data-open-settings="{{ '1' if open_settings else '0' }}">
+
+  {% include "partials/sidebar.html" %}
+
+  <main class="app-main" id="app-main">
+    <div class="room-placeholder" id="room-placeholder">
+      <svg class="room-placeholder__icon" aria-hidden="true"><use href="#i-chat"></use></svg>
+      <span class="room-placeholder__title" data-i18n="chat.no_room">Pick a room</span>
+      <span data-i18n="chat.no_room_hint">Rooms are listed on the left</span>
+    </div>
+
+    {% include "partials/chat.html" %}
+    {% include "partials/voice-bar.html" %}
+  </main>
+</div>
+
+{% include "partials/settings-modal.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}

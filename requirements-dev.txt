@@ -1,0 +1,12 @@
+# botyaratalk — зависимости для разработки, тестов и скриншотов
+-r requirements.txt
+
+# тесты
+pytest==9.0.3
+pytest-flask==1.3.0
+
+# E2E, скриншоты
+playwright>=1.49
+
+# линтер
+ruff>=0.6

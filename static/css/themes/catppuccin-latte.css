@@ -1,0 +1,50 @@
+/* Тема Catppuccin Latte — light
+   Палитра: Catppuccin. Значения цветов взяты из официальной палитры темы.
+   Селектор работает и для <html>, и для вложенных превью-карточек. */
+
+[data-theme="catppuccin-latte"] {
+  color-scheme: light;
+
+  /* --- сырая палитра ------------------------------------------------ */
+  --raw-base: #eff1f5;
+  --raw-mantle: #e6e9ef;
+  --raw-crust: #dce0e8;
+  --raw-text: #4c4f69;
+  --raw-subtext: #5c5f77;
+  --raw-overlay: #9ca0b0;
+  --raw-surface2: #acb0be;
+  --raw-surface1: #bcc0cc;
+  --raw-surface0: #ccd0da;
+  --raw-accent: #8839ef;
+  --raw-red: #d20f39;
+  --raw-green: #40a02b;
+  --raw-yellow: #df8e1d;
+  --raw-blue: #1e66f5;
+  --raw-peach: #fe640b;
+  --raw-mauve: #8839ef;
+
+  /* --- семантика (обязательный минимум) ----------------------------- */
+  --bg: var(--raw-base);
+  --bg-alt: var(--raw-mantle);
+  --bg-elevated: #ffffff;
+  --bg-inset: var(--raw-crust);
+  --fg: var(--raw-text);
+  --fg-muted: #5c5f77;
+  --fg-subtle: var(--raw-overlay);
+  --accent: var(--raw-accent);
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(136, 57, 239, 0.12);
+  --border: #bcc0cc;
+  --border-strong: #acb0be;
+  --danger: #d20f39;
+  --success: var(--raw-green);
+  --warning: #df8e1d;
+  --hover: #e6e9ef;
+  --active: rgba(136, 57, 239, 0.14);
+  --selection: rgba(136, 57, 239, 0.22);
+  --scrollbar: #bcc0cc;
+  --shadow: 0 8px 24px rgba(76, 79, 105, 0.16);
+  --overlay: rgba(76, 79, 105, 0.35);
+  --bubble-own: rgba(136, 57, 239, 0.12);
+  --bubble-own-fg: #4c4f69;
+}

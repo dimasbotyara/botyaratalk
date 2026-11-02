@@ -1,0 +1,50 @@
+/* Тема Gruvbox Dark — dark
+   Палитра: Gruvbox. Значения цветов взяты из официальной палитры темы.
+   Селектор работает и для <html>, и для вложенных превью-карточек. */
+
+[data-theme="gruvbox-dark"] {
+  color-scheme: dark;
+
+  /* --- сырая палитра ------------------------------------------------ */
+  --raw-base: #282828;
+  --raw-mantle: #1d2021;
+  --raw-crust: #141617;
+  --raw-text: #ebdbb2;
+  --raw-subtext: #d5c4a1;
+  --raw-overlay: #928374;
+  --raw-surface2: #665c54;
+  --raw-surface1: #504945;
+  --raw-surface0: #3c3836;
+  --raw-accent: #fabd2f;
+  --raw-red: #fb4934;
+  --raw-green: #b8bb26;
+  --raw-yellow: #fabd2f;
+  --raw-blue: #83a598;
+  --raw-peach: #fe8019;
+  --raw-mauve: #d3869b;
+
+  /* --- семантика (обязательный минимум) ----------------------------- */
+  --bg: var(--raw-base);
+  --bg-alt: var(--raw-mantle);
+  --bg-elevated: #32302f;
+  --bg-inset: var(--raw-crust);
+  --fg: var(--raw-text);
+  --fg-muted: #d5c4a1;
+  --fg-subtle: var(--raw-overlay);
+  --accent: var(--raw-accent);
+  --accent-fg: #282828;
+  --accent-soft: rgba(250, 189, 47, 0.14);
+  --border: #3c3836;
+  --border-strong: #504945;
+  --danger: #fb4934;
+  --success: var(--raw-green);
+  --warning: #fabd2f;
+  --hover: #32302f;
+  --active: rgba(250, 189, 47, 0.16);
+  --selection: rgba(250, 189, 47, 0.26);
+  --scrollbar: #504945;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --overlay: rgba(0, 0, 0, 0.6);
+  --bubble-own: rgba(250, 189, 47, 0.12);
+  --bubble-own-fg: #ebdbb2;
+}

@@ -1,0 +1,424 @@
+/* Голосовой канал: панель справа, сетка плиток участников, контролы. */
+
+.voice-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: var(--voice-panel-w);
+  flex: 0 0 var(--voice-panel-w);
+  border-left: 1px solid var(--border);
+  background: var(--bg-alt);
+  z-index: var(--z-voice);
+}
+
+.voice-panel__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.voice-panel__title {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-subtle);
+}
+
+.voice-panel__count {
+  margin-left: auto;
+}
+
+.voice-panel__join {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.voice-panel__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-3);
+}
+
+/* --- сетка участников ------------------------------------------------ */
+.voice-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+.voice-grid[data-count="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.voice-grid[data-count="3"],
+.voice-grid[data-count="4"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.voice-tile {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  isolation: isolate;
+}
+
+.voice-tile--speaking {
+  border-color: var(--success);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--success) 40%, transparent);
+}
+
+.voice-tile__media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: var(--bg-inset);
+}
+
+/* Удалённые аудио-элементы не должны занимать место в раскладке */
+.voice-tile__audio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.voice-tile__fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--fg-subtle);
+}
+
+.voice-tile__name {
+  position: absolute;
+  left: var(--space-2);
+  bottom: var(--space-2);
+  right: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--bg-inset) 78%, transparent);
+  backdrop-filter: blur(6px);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--fg);
+  overflow: hidden;
+}
+
+.voice-tile__name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-tile__badges {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  right: var(--space-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  justify-content: flex-start;
+}
+
+.voice-tile__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--bg-inset) 82%, transparent);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voice-tile__badge > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voice-tile__badge--sharing {
+  color: var(--accent);
+}
+
+/* Шаринг со звуком: рядом с иконкой экрана появляется динамик */
+.voice-tile__badge--audio {
+  gap: 5px;
+}
+
+.voice-tile__badge-audio-icon {
+  width: 12px;
+  height: 12px;
+  color: var(--success);
+  animation: audio-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes audio-pulse {
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
+}
+
+.voice-tile__badge--muted {
+  color: var(--danger);
+  background: none;
+  padding: 2px;
+}
+
+.voice-tile__badge .icon {
+  width: 12px;
+  height: 12px;
+}
+
+/* Пульсация, когда участник говорит */
+.voice-level {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  flex: 0 0 auto;
+  animation: level-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes level-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+/* --- список участников (компактный) ---------------------------------- */
+.voice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.voice-list__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+}
+
+.voice-list__row:hover {
+  background: var(--hover);
+}
+
+.voice-list__name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-list__empty {
+  padding: var(--space-3);
+  font-size: var(--fs-sm);
+  color: var(--fg-subtle);
+  text-align: center;
+}
+
+/* --- контролы -------------------------------------------------------- */
+.voice-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+  background: var(--bg-alt);
+}
+
+.ctrl-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  transition: background var(--t-fast), color var(--t-fast),
+    border-color var(--t-fast), transform var(--t-fast);
+}
+
+.ctrl-btn:hover {
+  background: var(--hover);
+  border-color: var(--border-strong);
+}
+
+.ctrl-btn:active {
+  transform: translateY(1px);
+}
+
+.ctrl-btn .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.ctrl-btn[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--accent);
+}
+
+.ctrl-btn--danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+}
+
+.ctrl-btn--danger:hover {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+}
+
+.ctrl-btn--wide {
+  width: auto;
+  padding: 0 var(--space-4);
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.ctrl-btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* --- статус соединения ---------------------------------------------- */
+.voice-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--fs-xs);
+  color: var(--fg-subtle);
+  border-top: 1px solid var(--border);
+}
+
+.voice-status__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+.voice-status[data-state="connecting"] .voice-status__dot {
+  background: var(--warning);
+  animation: level-pulse 1.2s infinite;
+}
+
+.voice-status[data-state="error"] .voice-status__dot {
+  background: var(--danger);
+}
+
+/* --- плавающая плашка «вы в голосе» ---------------------------------- */
+.voice-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--success) 16%, transparent);
+  color: var(--success);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.voice-pill__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: level-pulse 1.4s infinite;
+}
+
+/* --- предупреждение о HTTPS ----------------------------------------- */
+.voice-warning {
+  margin: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--warning);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-normal);
+}
+
+/* На узких экранах панель уезжает под чат */
+@media (max-width: 1280px) {
+  :root {
+    --voice-panel-w: 300px;
+  }
+}
+
+@media (max-width: 1180px) {
+  :root {
+    --voice-panel-w: 280px;
+  }
+
+  /* На узкой панели заголовок не нужен — остаются иконка, счётчик и закрытие */
+  .voice-panel__title {
+    display: none;
+  }
+
+  .voice-panel__header {
+    padding: var(--space-2) var(--space-3);
+  }
+}
+
+@media (max-width: 900px) {
+  .app-main {
+    position: relative;
+  }
+
+  .voice-panel {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: min(340px, 92vw);
+    box-shadow: var(--shadow);
+    transform: translateX(100%);
+    transition: transform var(--t-slow);
+  }
+
+  .voice-panel[data-open="true"] {
+    transform: none;
+  }
+}
+
+/* На узких плитках от бейджа шаринга остаются только иконки */
+@media (max-width: 1400px) {
+  .voice-tile__badge--sharing > span {
+    display: none;
+  }
+
+  .voice-tile__badge--sharing {
+    padding: 3px 5px;
+  }
+}
