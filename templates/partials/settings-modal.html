@@ -208,10 +208,15 @@
 
           <div class="settings-account">
             <span class="avatar avatar--lg" id="settings-avatar">?</span>
-            <div>
+            <div class="settings-account__info">
               <div class="settings-account__name" id="settings-username">—</div>
               <div class="settings-hint" data-i18n="settings.account">Account</div>
             </div>
+            <button type="button" class="btn btn--sm btn--ghost settings-account__edit" id="open-avatar-editor"
+                    data-i18n-title="avatar.open" data-i18n-aria-label="avatar.open">
+              <svg class="icon" aria-hidden="true"><use href="#i-camera"></use></svg>
+              <span data-i18n="avatar.change">Change avatar</span>
+            </button>
           </div>
 
           <div class="settings-row">

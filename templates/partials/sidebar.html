@@ -2,14 +2,7 @@
 <aside class="sidebar" id="sidebar">
   <div class="sidebar__brand">
     <svg class="sidebar__logo" aria-hidden="true"><use href="#i-logo"></use></svg>
-    <div>
-      <div class="sidebar__title">botyaratalk</div>
-      <div class="sidebar__subtitle" data-i18n="app.tagline">A messenger for your local network</div>
-    </div>
-  </div>
-
-  <div class="sidebar__section-title">
-    <span data-i18n="sidebar.rooms">Rooms</span>
+    <div class="sidebar__title">botyaratalk</div>
   </div>
 
   <nav class="sidebar__rooms" id="room-list" aria-label="Rooms" data-i18n-aria-label="a11y.room_list">
@@ -21,11 +14,11 @@
     <span class="sidebar__user-name" id="sidebar-username">{{ user.username if user else '' }}</span>
 
     <div class="sidebar__user-actions">
-      <button type="button" class="btn btn--icon btn--ghost btn--sm" id="open-settings"
+      <button type="button" class="btn btn--icon btn--ghost sidebar__action" id="open-settings"
               data-i18n-aria-label="a11y.settings" data-i18n-title="sidebar.settings">
         <svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg>
       </button>
-      <button type="button" class="btn btn--icon btn--ghost btn--sm" id="logout"
+      <button type="button" class="btn btn--icon btn--ghost sidebar__action" id="logout"
               data-i18n-aria-label="a11y.logout" data-i18n-title="sidebar.logout">
         <svg class="icon" aria-hidden="true"><use href="#i-logout"></use></svg>
       </button>

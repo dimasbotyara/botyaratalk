@@ -2,21 +2,15 @@
 <section class="chat" id="chat" hidden aria-labelledby="room-title">
   <header class="room-header">
     <svg class="room-header__icon" aria-hidden="true"><use href="#i-hash"></use></svg>
-    <div>
-      <h1 class="room-header__title" id="room-title">—</h1>
-      <div class="room-header__meta" data-i18n="room.text_channel">Text channel</div>
-    </div>
+    <h1 class="room-header__title" id="room-title">—</h1>
 
     <div class="room-header__actions">
-      <span class="voice-pill" id="voice-pill" hidden>
+      <button type="button" class="voice-pill" id="voice-pill" hidden
+              data-i18n-title="voice.open_stage" data-i18n-aria-label="voice.open_stage">
         <span class="voice-pill__dot" aria-hidden="true"></span>
         <span data-i18n="voice.connected">In the voice channel</span>
-      </span>
-
-      <button type="button" class="btn btn--icon btn--ghost" id="toggle-voice-panel"
-              data-i18n-aria-label="room.voice_channel" data-i18n-title="room.voice_channel">
-        <svg class="icon" aria-hidden="true"><use href="#i-headphones"></use></svg>
       </button>
+
     </div>
   </header>
 
@@ -33,6 +27,8 @@
   </div>
 
   <div class="typing" id="typing-indicator" aria-live="polite"></div>
+
+  <div class="composer__reply-bar" id="composer-reply" hidden></div>
 
   <form class="composer" id="composer" autocomplete="off">
     <div class="composer__box">

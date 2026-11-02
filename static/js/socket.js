@@ -99,6 +99,7 @@ export function connect() {
     'voice_roster',
     'voice_media_state',
     'text_message',
+    'message_reactions',
     'message_notification',
     'typing',
     'offer',

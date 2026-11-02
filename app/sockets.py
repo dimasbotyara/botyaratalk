@@ -14,7 +14,7 @@ from flask_socketio import emit
 from flask_socketio import join_room as sio_join
 from flask_socketio import leave_room as sio_leave
 
-from .models import Message, Room, db
+from .models import Message, Reaction, Room, db
 from .signaling import RoomFull, VoiceRegistry
 
 registry = VoiceRegistry()
@@ -157,11 +157,31 @@ def register(socketio) -> None:
         if _rate_limited(user["id"]):
             return _err("rate_limited")
 
-        message = Message(room_id=room.id, user_id=user["id"], text=text)
+        # Ответ на сообщение: id проверяем, чтобы не привязаться к чужой комнате
+        reply_to = data.get("reply_to")
+        reply_previews: dict[int, dict] = {}
+        if reply_to:
+            try:
+                reply_id = int(reply_to)
+            except (TypeError, ValueError):
+                reply_id = 0
+            source = db.session.get(Message, reply_id) if reply_id else None
+            if source and source.room_id == room.id:
+                reply_previews[source.id] = {
+                    "id": source.id,
+                    "username": source.author.username if source.author else "?",
+                    "text": source.text[:180],
+                }
+            else:
+                reply_id = None
+        else:
+            reply_id = None
+
+        message = Message(room_id=room.id, user_id=user["id"], text=text, reply_to_id=reply_id)
         db.session.add(message)
         db.session.commit()
 
-        payload = message.to_public()
+        payload = message.to_public(reply_previews=reply_previews)
         socketio.emit("text_message", _ok(**payload), to=_text_room(slug))
 
         # Уведомления: шлём всем, клиент сам решит, показывать ли.
@@ -175,6 +195,56 @@ def register(socketio) -> None:
         }
         socketio.emit("message_notification", _ok(**notification), skip_sid=request.sid)
         return _ok(id=payload["id"], ts=payload["ts"])
+
+    @socketio.on("reaction")
+    def on_reaction(data):
+        """Ставит/снимает реакцию. Один пользователь — одна реакция на сообщение.
+
+        Повторный клик по тому же эмодзи снимает реакцию, клик по другому —
+        заменяет её (как в большинстве мессенджеров).
+        """
+        user = _user()
+        if not user:
+            return _err("unauthorized")
+
+        data = data or {}
+        slug = str(data.get("room", ""))
+        emoji = str(data.get("emoji", ""))[:16]
+
+        room = _room_by_slug(slug)
+        if not room:
+            return _err("room_not_found")
+        if not emoji:
+            return _err("empty_reaction")
+
+        try:
+            message_id = int(data.get("message_id", 0))
+        except (TypeError, ValueError):
+            return _err("bad_message")
+
+        message = db.session.get(Message, message_id)
+        if not message or message.room_id != room.id:
+            return _err("message_not_found")
+
+        existing = Reaction.query.filter_by(message_id=message.id, user_id=user["id"]).first()
+        if existing and existing.emoji == emoji:
+            db.session.delete(existing)
+        elif existing:
+            existing.emoji = emoji
+        else:
+            db.session.add(Reaction(message_id=message.id, user_id=user["id"], emoji=emoji))
+        db.session.commit()
+
+        # Перечитываем с реакциями и рассылаем всем в комнате
+        db.session.expire_all()
+        message = db.session.get(Message, message_id)
+        payload = {
+            "room": slug,
+            "message_id": message.id,
+            "reactions": message.reactions_public(),
+        }
+        socketio.emit("message_reactions", _ok(**payload), to=_text_room(slug))
+        return _ok(**payload)
 
     @socketio.on("typing")
     def on_typing(data):
@@ -194,6 +264,14 @@ def register(socketio) -> None:
     # =====================================================================
     # Голосовые каналы
     # =====================================================================
+    def _announce_voice_left(slug: str, user: dict) -> None:
+        """Сообщает комнате, что участник из неё ушёл (и сбрасывает его шаринг)."""
+        socketio.emit("voice_user_left", _ok(room=slug, user_id=user["id"]), to=_voice_room(slug))
+        socketio.emit(
+            "screen_state", _ok(room=slug, user_id=user["id"], sharing=False), to=_voice_room(slug)
+        )
+        socketio.emit("voice_roster", _ok(room=slug, users=registry.participants(slug)), to=_voice_room(slug))
+
     @socketio.on("voice_join")
     def on_voice_join(data):
         user = _user()
@@ -204,12 +282,25 @@ def register(socketio) -> None:
         if not _room_by_slug(slug):
             return _err("room_not_found")
 
+        # Каналы, где пользователь висел раньше: join() вычищает его оттуда
+        # атомарно, но разослать уведомления нужно отдельно.
+        previous = sorted(
+            {room for room in registry.rooms_of_sid(request.sid) if room != slug}
+            | {room for room in registry.rooms_of_user(user["id"]) if room != slug}
+        )
+
         try:
             participants_before, is_new = registry.join(
                 slug, user["id"], user["username"], request.sid, now=time.time()
             )
         except RoomFull:
             return _err("voice_full")
+
+        # Явно выходим из socket-комнат прошлых каналов и сообщаем об уходе,
+        # иначе у собеседников в старом канале навсегда остаётся «призрак».
+        for other in previous:
+            sio_leave(_voice_room(other))
+            _announce_voice_left(other, user)
 
         sio_join(_voice_room(slug))
 
@@ -238,9 +329,7 @@ def register(socketio) -> None:
             return _err("unauthorized")
         slug = str((data or {}).get("room", ""))
         if registry.leave(slug, user["id"]):
-            socketio.emit("voice_user_left", _ok(room=slug, user_id=user["id"]), to=_voice_room(slug))
-            socketio.emit("screen_state", _ok(room=slug, user_id=user["id"], sharing=False), to=_voice_room(slug))
-            socketio.emit("voice_roster", _ok(room=slug, users=registry.participants(slug)), to=_voice_room(slug))
+            _announce_voice_left(slug, user)
         sio_leave(_voice_room(slug))
         return _ok(room=slug)
 
@@ -274,6 +363,7 @@ def register(socketio) -> None:
         audio = bool(data.get("audio", False))
         if not registry.set_flag(slug, user["id"], "sharing", True):
             return _err("not_in_voice")
+        registry.set_flag(slug, user["id"], "screen_audio", audio)
         socketio.emit(
             "screen_state",
             _ok(room=slug, user_id=user["id"], sharing=True, audio=audio),
@@ -288,6 +378,7 @@ def register(socketio) -> None:
             return _err("unauthorized")
         slug = str((data or {}).get("room", ""))
         registry.set_flag(slug, user["id"], "sharing", False)
+        registry.set_flag(slug, user["id"], "screen_audio", False)
         socketio.emit("screen_state", _ok(room=slug, user_id=user["id"], sharing=False), to=_voice_room(slug))
         return _ok()
 
@@ -362,6 +453,11 @@ def register(socketio) -> None:
                 "room": (data or {}).get("room"),
             },
         )
+
+
+def get_registry() -> VoiceRegistry:
+    """Доступ к реестру голосовых комнат (нужен тестам и health-эндпоинту)."""
+    return registry
 
 
 def reset_registry() -> None:

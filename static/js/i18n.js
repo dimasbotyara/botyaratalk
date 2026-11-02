@@ -21,6 +21,16 @@ export function normalizeLang(value) {
 export function detectLang() {
   const saved = storage.get('lang');
   if (saved === 'ru' || saved === 'en') return saved;
+
+  // Язык выбрал сервер (cookie из онбординга или чистый Accept-Language).
+  // Браузер тут спрашивать нельзя: у Playwright/встроенных WebView локаль
+  // часто en-US, и русский интерфейс внезапно становился английским.
+  const meta = document.querySelector('meta[name="botyaratalk-config"]');
+  const serverLang = meta?.dataset?.lang;
+  if (serverLang === 'ru' || serverLang === 'en') {
+    storage.set('lang', serverLang);
+    return serverLang;
+  }
   return normalizeLang(navigator.language || 'en');
 }
 

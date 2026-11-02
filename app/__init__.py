@@ -34,6 +34,8 @@ def create_app(config_object=None) -> Flask:
 
     # Путь к локалям задаём в конфиге один раз
     app.config.setdefault("LOCALES_DIR", str(Path(app.root_path).parent / "locales"))
+    # Каталог аватарок создаём сразу: иначе первая же загрузка упадёт
+    Path(app.config["AVATAR_DIR"]).mkdir(parents=True, exist_ok=True)
 
     # --- БД -------------------------------------------------------------
     db_module.init_db(app)

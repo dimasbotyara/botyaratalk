@@ -1,0 +1,299 @@
+/* Аватарка: модалка с обрезкой и генератором пиксельного узора. */
+
+.modal--avatar .modal__dialog {
+  width: min(520px, 100%);
+}
+
+.avatar-tabs {
+  display: flex;
+  gap: var(--space-1);
+  padding: 0 var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.avatar-tab {
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--t-fast), border-color var(--t-fast);
+}
+
+.avatar-tab:hover {
+  color: var(--fg);
+}
+
+.avatar-tab.is-active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* У настроек .modal__body — это сетка «навигация + панель». Для аватарки
+   она не подходит: здесь обычный блок на всю ширину. */
+.modal--avatar .modal__body {
+  display: block;
+  overflow-y: auto;
+}
+
+.avatar-body {
+  padding: var(--space-4) var(--space-5);
+}
+
+/* --- вкладка «Загрузить» --------------------------------------------- */
+.avatar-pane[hidden] {
+  display: none;
+}
+
+.avatar-crop {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-4);
+}
+
+.avatar-viewport {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent),
+    var(--bg);
+  border: 2px dashed var(--border-strong);
+  cursor: grab;
+  touch-action: none;
+  /* картинку внутри двигаем сами, браузерный скролл тут не нужен */
+  user-select: none;
+}
+
+.avatar-viewport:active {
+  cursor: grabbing;
+}
+
+.avatar-viewport__canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.avatar-viewport__hint {
+  position: absolute;
+  inset: auto 0 12px;
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--fg-subtle);
+  pointer-events: none;
+  text-shadow: 0 1px 3px var(--bg);
+}
+
+.avatar-viewport.is-filled .avatar-viewport__hint {
+  display: none;
+}
+
+.avatar-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.avatar-file {
+  cursor: pointer;
+}
+
+.avatar-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--fg-muted);
+}
+
+.avatar-zoom input[type="range"] {
+  width: 140px;
+  accent-color: var(--accent);
+}
+
+.avatar-pane .settings-hint {
+  text-align: center;
+}
+
+/* --- вкладка «Сгенерировать» ----------------------------------------- */
+.avatar-generator {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.avatar-generator__preview {
+  flex: 0 0 auto;
+  width: 168px;
+  height: 168px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  /* 32×32 должно выглядеть пиксельно, а не мыльно */
+  image-rendering: pixelated;
+}
+
+.avatar-generator__controls {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.avatar-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  width: 100%;
+}
+
+.avatar-field__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.avatar-field__value {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.avatar-field input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.avatar-palettes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  /* 8 палитр в один ряд при ширине модалки */
+  max-width: 100%;
+}
+
+.avatar-palette {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--swatch-bg, var(--accent));
+  cursor: pointer;
+  transition: transform var(--t-fast), border-color var(--t-fast);
+}
+
+.avatar-palette__dot {
+  display: block;
+  width: 8px;
+  height: 8px;
+  margin: 0 auto;
+  border-radius: 2px;
+  background: var(--swatch-fg, var(--bg));
+}
+
+.avatar-palette:hover {
+  transform: scale(1.08);
+}
+
+.avatar-palette.is-active {
+  border-color: var(--fg);
+  transform: scale(1.08);
+}
+
+.avatar-seed {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.avatar-seed .input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
+
+/* --- подвал ----------------------------------------------------------- */
+.avatar-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.avatar-footer__spacer {
+  flex: 1 1 auto;
+}
+
+/* --- кнопка в настройках ---------------------------------------------- */
+.settings-account {
+  position: relative;
+}
+
+.settings-account__info {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.settings-account__edit {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* --- мобильная раскладка ---------------------------------------------- */
+@media (max-width: 560px) {
+  .avatar-tabs {
+    padding: 0 var(--space-4);
+  }
+
+  .avatar-body {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .avatar-viewport {
+    width: min(240px, 66vw);
+    height: min(240px, 66vw);
+  }
+
+  .avatar-generator {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .avatar-generator__preview {
+    width: 132px;
+    height: 132px;
+  }
+
+  .avatar-generator__controls {
+    width: 100%;
+  }
+
+  .avatar-footer {
+    flex-wrap: wrap;
+  }
+
+  .settings-account {
+    flex-wrap: wrap;
+  }
+
+  .settings-account__edit {
+    width: 100%;
+    justify-content: center;
+  }
+}

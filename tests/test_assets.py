@@ -113,6 +113,7 @@ def test_all_project_files_present():
         "app/sockets.py",
         "app/signaling.py",
         "app/i18n.py",
+        "app/tls.py",
         "locales/ru.json",
         "locales/en.json",
         "static/js/main.js",
@@ -127,6 +128,7 @@ def test_all_project_files_present():
         "static/js/settings.js",
         "static/js/notifications.js",
         "static/js/utils.js",
+        "static/js/stage.js",
         "static/js/noise.js",
         "static/js/socket.js",
         "templates/base.html",
@@ -198,3 +200,66 @@ def test_theme_files_have_required_variables():
         css = path.read_text(encoding="utf-8")
         for variable in required:
             assert variable in css, f"{path.name}: нет {variable}"
+
+
+def test_https_certificate_generation(tmp_path):
+    """HTTPS для LAN: сертификат создаётся сам и содержит SAN с IP-адресами."""
+    from app.tls import ensure_certificate, local_ip_addresses
+
+    cert = tmp_path / "cert.pem"
+    key = tmp_path / "key.pem"
+    assert ensure_certificate(cert, key) is True
+    assert cert.exists() and key.exists()
+
+    body = cert.read_text(encoding="utf-8")
+    assert "BEGIN CERTIFICATE" in body
+    # PKCS#1 («RSA PRIVATE KEY») понимают и openssl, и ssl.load_cert_chain
+    assert "PRIVATE KEY" in key.read_text(encoding="utf-8")
+
+    # SAN обязателен: без него Chromium не пустит на https://192.168.x.x
+    import ssl
+
+    info = ssl._ssl._test_decode_cert(str(cert))  # noqa: SLF001 (публичного API нет)
+    alt_names = [value for entry in info.get("subjectAltName", ()) for value in entry]
+    assert "IP Address" in alt_names or "IP" in alt_names
+    assert local_ip_addresses()
+
+    # Повторный вызов не перегенерирует файлы (иначе сертификат «мигал» бы)
+    fingerprint = cert.read_bytes()
+    assert ensure_certificate(cert, key) is True
+    assert cert.read_bytes() == fingerprint
+
+
+def test_run_py_has_no_hardcoded_ssl_paths():
+    """run.py не должен содержать жёстко прописанных путей и IP сертификата."""
+    run_py = (ROOT / "run.py").read_text(encoding="utf-8")
+    assert "ssl_context" in run_py
+    assert "cert.pem" not in run_py, "пути к сертификату живут в config.py"
+    # 0.0.0.0 — это адрес привязки по умолчанию, а не захардкоженный IP машины
+    hardcoded = [
+        addr for addr in re.findall(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", run_py)
+        if addr != "0.0.0.0"
+    ]
+    assert not hardcoded, f"в run.py зашит IP: {hardcoded}"
+    assert "openssl" not in run_py, "генерация сертификата вынесена в app/tls.py"
+
+
+def test_gitignore_ignores_certificates_and_notes():
+    ignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+    for entry in ("*.pem", "AUDIT.md", "DECISIONS.md"):
+        assert entry in ignore, f"в .gitignore нет {entry}"
+
+
+def test_stage_module_and_layout_hooks():
+    """Раскладка голосовой зоны: модуль stage.js и его CSS-хуки на месте."""
+    stage = (ROOT / "static" / "js" / "stage.js").read_text(encoding="utf-8")
+    for symbol in ("applyMode", "setSpotlight", "requestPictureInPicture", "voice:layout-changed"):
+        assert symbol in stage, f"в stage.js нет {symbol}"
+
+    css = (ROOT / "static" / "css" / "voice.css").read_text(encoding="utf-8")
+    for selector in ('data-voice-layout="pinned"', 'data-voice-layout="stage"', "voice-tile--spotlight"):
+        assert selector in css, f"в voice.css нет {selector}"
+
+    template = (ROOT / "templates" / "partials" / "voice-bar.html").read_text(encoding="utf-8")
+    for element_id in ("voice-pin", "voice-fullscreen", "voice-exit-fullscreen", "btn-monitor"):
+        assert f'id="{element_id}"' in template, f"нет кнопки {element_id}"

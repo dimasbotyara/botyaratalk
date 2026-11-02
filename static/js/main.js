@@ -11,8 +11,11 @@ import { connect, emit, isConnected } from './socket.js';
 import { getCurrentRoom, initRooms, selectRoom } from './rooms.js';
 import { initTextChat, openRoom, scrollToBottom } from './textchat.js';
 import { initVoice, isInVoice, joinVoice, leaveVoice, setScreenController } from './voice.js';
+import { initStage } from './stage.js';
 import { initScreen } from './screen.js';
 import { initSettings, openSettings } from './settings.js';
+import { initAvatarEditor } from './avatar.js';
+import { buildAvatar } from './message.js';
 import * as notifications from './notifications.js';
 
 const state = { ready: false };
@@ -28,10 +31,25 @@ async function loadMe() {
 }
 
 function renderUser(user) {
-  const avatar = $('#sidebar-avatar');
   const name = $('#sidebar-username');
-  if (avatar) avatar.textContent = initials(user.username);
   if (name) name.textContent = user.username;
+
+  // Аватарка: картинка, если загружена/сгенерирована, иначе инициалы
+  const avatar = $('#sidebar-avatar');
+  if (avatar) {
+    const fresh = buildAvatar(user, 'avatar');
+    fresh.id = 'sidebar-avatar';
+    if (user.avatar?.url) fresh.setAttribute('aria-hidden', 'true');
+    else fresh.textContent = initials(user.username);
+    avatar.replaceWith(fresh);
+  }
+
+  const settingsAvatar = $('#settings-avatar');
+  if (settingsAvatar) {
+    const fresh = buildAvatar(user, 'avatar avatar--lg');
+    fresh.id = 'settings-avatar';
+    settingsAvatar.replaceWith(fresh);
+  }
   document.title = 'botyaratalk';
 }
 
@@ -88,7 +106,10 @@ function bindGlobalUI() {
   // Быстрый доступ к настройкам с клавиатуры
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
-      $('#voice-panel')?.setAttribute('data-open', 'false');
+      // В полноэкранном режиме Esc сначала сворачивает голосовую зону
+      if (document.querySelector('#app-shell')?.dataset.voiceLayout === 'normal') {
+        $('#voice-panel')?.setAttribute('data-open', 'false');
+      }
     }
     if ((event.ctrlKey || event.metaKey) && event.key === ',') {
       event.preventDefault();
@@ -149,12 +170,20 @@ async function init() {
   renderUser(user);
 
   initTextChat();
+  initAvatarEditor();
   initVoice();
+  initStage();
   setScreenController(initScreen());
   const openSettingsOnBoot = document.querySelector('#app-shell')?.dataset.openSettings === '1';
   await initSettings({ open: openSettingsOnBoot });
   bindGlobalUI();
   bindNotifications();
+
+  bus.on('avatar:changed', () => {
+    loadMe().then((fresh) => {
+      if (fresh) renderUser(fresh);
+    });
+  });
   bindSocketLifecycle();
 
   connect();

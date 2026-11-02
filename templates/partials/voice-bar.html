@@ -4,28 +4,46 @@
     <svg class="icon" aria-hidden="true"><use href="#i-headphones"></use></svg>
     <span class="voice-panel__title" id="voice-panel-title" data-i18n="room.voice_channel">Voice channel</span>
     <span class="badge voice-panel__count" id="voice-count" hidden>0</span>
-    <button type="button" class="btn btn--icon btn--ghost btn--sm" id="close-voice-panel"
-            data-i18n-aria-label="common.close">
-      <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
-    </button>
+
+    <div class="voice-panel__actions">
+      <button type="button" class="btn btn--icon btn--ghost btn--sm" id="voice-pin"
+              aria-pressed="false" data-i18n-aria-label="voice.pin" data-i18n-title="voice.pin">
+        <svg class="icon" aria-hidden="true"><use href="#i-expand"></use></svg>
+      </button>
+      <button type="button" class="btn btn--icon btn--ghost btn--sm" id="voice-fullscreen"
+              aria-pressed="false" data-i18n-aria-label="voice.fullscreen" data-i18n-title="voice.fullscreen">
+        <svg class="icon" aria-hidden="true"><use href="#i-maximize"></use></svg>
+      </button>
+      <button type="button" class="btn btn--icon btn--ghost btn--sm" id="close-voice-panel"
+              data-i18n-aria-label="common.close" data-i18n-title="common.close">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
   </header>
 
-  <div class="voice-warning" id="voice-secure-warning" hidden>
-    <svg class="icon" aria-hidden="true"><use href="#i-warning"></use></svg>
-    <span data-i18n="voice.secure_context">Calls need HTTPS or localhost</span>
-  </div>
-
-  <div class="voice-panel__join" id="voice-join-block">
-    <button type="button" class="btn btn--primary btn--block" id="voice-join">
-      <svg class="icon" aria-hidden="true"><use href="#i-headphones"></use></svg>
-      <span data-i18n="voice.join">Join voice</span>
+  <div class="voice-stage" id="voice-stage">
+    <button type="button" class="voice-stage__collapse" id="voice-exit-fullscreen"
+            data-i18n-title="voice.collapse">
+      <svg class="icon" aria-hidden="true"><use href="#i-minimize"></use></svg>
+      <span data-i18n="voice.collapse">Collapse</span>
     </button>
-    <span class="settings-hint" data-i18n="voice.join_hint">Your mic goes live right away</span>
-  </div>
 
-  <div class="voice-panel__body" id="voice-body" hidden>
-    <div class="voice-grid" id="voice-grid" data-count="1">
-      <!-- Participant tiles are rendered by voice.js -->
+    <div class="voice-warning" id="voice-secure-warning" hidden>
+      <svg class="icon" aria-hidden="true"><use href="#i-warning"></use></svg>
+      <span data-i18n="voice.secure_context">Calls need HTTPS or localhost</span>
+    </div>
+
+    <div class="voice-panel__join" id="voice-join-block">
+      <button type="button" class="btn btn--primary btn--block" id="voice-join">
+        <svg class="icon" aria-hidden="true"><use href="#i-headphones"></use></svg>
+        <span data-i18n="voice.join">Join voice</span>
+      </button>
+    </div>
+
+    <div class="voice-panel__body" id="voice-body" hidden>
+      <div class="voice-grid" id="voice-grid" data-count="1" data-spotlight="0">
+        <!-- Participant tiles are rendered by voice.js -->
+      </div>
     </div>
   </div>
 
@@ -35,6 +53,11 @@
     <button type="button" class="ctrl-btn" id="btn-mute" aria-pressed="false"
             data-i18n-aria-label="voice.mute" data-i18n-title="voice.mute">
       <svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg>
+    </button>
+
+    <button type="button" class="ctrl-btn" id="btn-monitor" aria-pressed="false"
+            data-i18n-aria-label="voice.monitor_on" data-i18n-title="voice.monitor_on">
+      <svg class="icon" aria-hidden="true"><use href="#i-headphones"></use></svg>
     </button>
 
     <button type="button" class="ctrl-btn" id="btn-camera" aria-pressed="false"

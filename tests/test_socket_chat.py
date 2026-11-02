@@ -48,12 +48,15 @@ def test_registry_max_participants():
 
 
 def test_registry_leave_all_by_sid():
+    """Один и тот же sid может принадлежать двум разным пользователям
+    (например, две вкладки с разными аккаунтами) — leave_all чистит обоих."""
     registry = VoiceRegistry()
     registry.join("channel-1", 1, "a", "shared-sid")
-    registry.join("channel-2", 1, "a", "shared-sid")
+    registry.join("channel-2", 2, "b", "shared-sid")
     removed = registry.leave_all("shared-sid")
     assert sorted(slug for slug, _ in removed) == ["channel-1", "channel-2"]
     assert registry.participants("channel-1") == []
+    assert registry.participants("channel-2") == []
 
 
 def test_registry_flags():
@@ -182,3 +185,50 @@ def test_screen_state_events(socket_authed):
 def test_max_participants_constant_documented():
     # Mesh-топология: держим лимит небольшим, чтобы LAN-сервер не захлебнулся
     assert 2 <= MAX_VOICE_PARTICIPANTS <= 10
+
+def test_registry_user_lives_in_exactly_one_voice_room():
+    """Баг «два меня в двух каналах»: пользователь не может быть в двух сразу."""
+    registry = VoiceRegistry(max_participants=8)
+    registry.join("channel-1", 1, "alice", "sid-a")
+    assert registry.rooms_of_user(1) == ["channel-1"]
+
+    # Переход в другой канал вычищает предыдущий, даже если клиент не позвал leave
+    registry.join("channel-2", 1, "alice", "sid-a")
+    assert registry.rooms_of_user(1) == ["channel-2"]
+    assert registry.participants("channel-1") == []
+
+    registry.join("channel-3", 1, "alice", "sid-a")
+    assert registry.rooms_of_user(1) == ["channel-3"]
+    assert registry.participants("channel-1") == []
+    assert registry.participants("channel-2") == []
+    assert len(registry.participants("channel-3")) == 1
+
+
+def test_registry_switch_is_atomic():
+    """switch() оставляет пользователя ровно в одном канале."""
+    registry = VoiceRegistry(max_participants=8)
+    registry.join("channel-1", 1, "alice", "sid-a")
+    registry.join("channel-1", 2, "bob", "sid-b")
+
+    meta, users_before, is_new = registry.switch("channel-1", "channel-2", 1, "alice", "sid-a")
+    assert meta["left"] is True
+    assert is_new is True
+    assert users_before == []  # в channel-2 до перехода никого не было
+    assert registry.rooms_of_user(1) == ["channel-2"]
+    assert [peer["username"] for peer in registry.participants("channel-1")] == ["bob"]
+    assert [peer["username"] for peer in registry.participants("channel-2")] == ["alice"]
+
+
+def test_voice_join_releases_previous_channel(app, socket_authed, auth_helper):
+    """Через сокет: вход во второй канал убирает пользователя из первого."""
+    from app.sockets import get_registry
+
+    client, user = socket_authed()
+    client.emit("voice_join", {"room": "channel-1"})
+    client.get_received()
+    assert get_registry().rooms_of_user(user["id"]) == ["channel-1"]
+
+    client.emit("voice_join", {"room": "channel-2"})
+    client.get_received()
+    assert get_registry().rooms_of_user(user["id"]) == ["channel-2"]
+    assert get_registry().participants("channel-1") == []

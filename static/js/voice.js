@@ -19,7 +19,10 @@ import {
 import { t } from './i18n.js';
 import { emit, on, request } from './socket.js';
 import { createRnnoiseNode, destroyRnnoiseNode, rnnoiseInfo } from './noise.js';
-import { getRoom, selectRoom, setVoiceCount } from './rooms.js';
+import { getRoom, setVoiceCount, setVoiceCurrent } from './rooms.js';
+import {
+  attachPictureInPictureButton, clearSpotlight, getMode, getSpotlight, setSpotlight,
+} from './stage.js';
 
 const MAX_PARTICIPANTS = 8;
 
@@ -43,6 +46,9 @@ const state = {
   rafId: 0,
   levels: new Map(), // userId -> уровень 0..1
   localTile: null,
+  localScreenTile: null, // отдельная плитка собственной демонстрации
+  monitorOn: false,      // «слышать себя» прямо в звонке
+  monitorBeforeMute: false,
 };
 
 const els = {};
@@ -183,10 +189,20 @@ function tileAvatar(name) {
   return node;
 }
 
-function createTile({ userId, username, isLocal = false }) {
+/**
+ * Плитка участника.
+ *
+ * @param {'camera'|'screen'} kind — обычная плитка (микрофон/камера) или
+ *   отдельная плитка демонстрации экрана. Демонстрация всегда рисуется
+ *   отдельной плиткой, поэтому камера и экран видны одновременно.
+ */
+function createTile({ userId, username, isLocal = false, kind = 'camera' }) {
+  const tileId = kind === 'screen' ? `${userId}-screen` : String(userId);
   const tile = el('div', {
-    class: 'voice-tile',
-    dataset: { tile: String(userId), local: String(isLocal) },
+    class: `voice-tile voice-tile--${kind}`,
+    dataset: { tile: tileId, local: String(isLocal), kind },
+    tabindex: '0',
+    role: 'button',
   });
 
   const video = el('video', {
@@ -198,28 +214,58 @@ function createTile({ userId, username, isLocal = false }) {
   video.muted = isLocal;
   video.hidden = true;
 
-  const fallback = el(
-    'div',
-    { class: 'voice-tile__fallback' },
-    tileAvatar(username),
-    el('span', { class: 'settings-hint' }, isLocal ? t('voice.you') : t('voice.audio_only')),
-  );
+  const fallback = el('div', { class: 'voice-tile__fallback' }, tileAvatar(username));
+
+  // «это вы» / «только звук» убраны: имя на плитке говорит само за себя,
+  // а демонстрация подписана отдельно
+  const label = kind === 'screen' ? `${username} · ${t('screen_sharing')}` : username;
 
   const nameRow = el(
     'div',
     { class: 'voice-tile__name' },
     el('span', { class: 'voice-level', hidden: true }),
-    el('span', {}, isLocal ? `${username} · ${t('voice.you')}` : username),
+    el('span', {}, label),
   );
 
   const badges = el('div', { class: 'voice-tile__badges' });
 
   tile.append(video, fallback, badges, nameRow);
-  return { tile, video, fallback, nameRow, badges };
+
+  // Разворот плитки на большую площадь (только в закреплённом/полноэкранном режиме)
+  tile.addEventListener('click', () => {
+    if (!video.hidden) video.play().catch(() => {});
+    setSpotlight(tileId);
+  });
+  tile.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setSpotlight(tileId);
+    }
+  });
+
+  return { tile, video, fallback, nameRow, badges, kind, tileId };
+}
+
+/** Бейдж на плитке демонстрации: только отметка «со звуком / без звука». */
+function paintScreenBadge(entry, node) {
+  const badges = node.badges;
+  badges.innerHTML = '';
+  const withAudio = Boolean(entry.screenAudioOn);
+  const badge = el('span', {
+    class: `voice-tile__badge voice-tile__badge--sharing${withAudio ? ' voice-tile__badge--audio' : ''}`,
+    title: withAudio ? t('voice.screen_audio') : t('voice.screen_silent'),
+    dataset: { screenBadge: '1', screenAudio: withAudio ? '1' : '0' },
+  });
+  badge.append(icon('screen'));
+  if (withAudio) badge.append(icon('volume', 'voice-tile__badge-audio-icon'));
+  badges.append(badge);
 }
 
 function updateTileBadges(entry) {
-  if (!entry.tileNode) return;
+  if (entry.tileNode && entry.tileNode.kind === 'screen') paintScreenBadge(entry, entry.tileNode);
+  if (entry.screenTile) paintScreenBadge(entry, entry.screenTile);
+  if (!entry.tileNode || entry.tileNode.kind === 'screen') return;
+
   const badges = entry.tileNode.badges;
   badges.innerHTML = '';
 
@@ -228,82 +274,139 @@ function updateTileBadges(entry) {
     badge.append(icon('mic-off'));
     badges.append(badge);
   }
-  if (entry.sharing) {
-    const withAudio = Boolean(entry.screenAudioOn);
-    const badge = el('span', {
-      class: `voice-tile__badge voice-tile__badge--sharing${withAudio ? ' voice-tile__badge--audio' : ''}`,
-      title: withAudio ? `${t('screen_sharing')} · ${t('voice.screen_audio')}` : t('screen_sharing'),
-      dataset: { screenBadge: '1', screenAudio: withAudio ? '1' : '0' },
-    });
-    badge.append(icon('screen'));
-    badge.append(el('span', {}, t('screen_sharing')));
-    if (withAudio) badge.append(icon('volume', 'voice-tile__badge-audio-icon'));
-    badges.append(badge);
-  }
+  // Демонстрация рисуется отдельной плиткой, поэтому на плитке камеры
+  // бейджа «демонстрация» больше нет — он только дублировал информацию.
 }
 
-function mountTile(userId) {
-  const entry = userId === 'local' ? state.localTileEntry : state.peers.get(Number(userId));
-  if (!entry?.tileNode) return;
+/**
+ * Ставит плитку в сетку. Порядок: сначала участники, потом их демонстрации —
+ * так экран всегда оказывается ниже камеры и не «перепрыгивает» при обновлении.
+ */
+/** Ставит конкретную плитку в сетку с учётом порядка «камеры выше экранов». */
+function mountNode(node) {
+  if (!node?.tile) return;
   const grid = els.grid;
-  if (!grid.contains(entry.tileNode.tile)) grid.append(entry.tileNode.tile);
+  if (!grid.contains(node.tile)) {
+    if (node.kind === 'screen') {
+      grid.append(node.tile);
+    } else {
+      const firstScreen = grid.querySelector('.voice-tile--screen');
+      if (firstScreen) grid.insertBefore(node.tile, firstScreen);
+      else grid.append(node.tile);
+    }
+  }
   updateGridCount();
 }
 
-function unmountTile(userId) {
-  const entry = userId === 'local' ? state.localTileEntry : state.peers.get(Number(userId));
-  entry?.tileNode?.tile.remove();
-  updateGridCount();
+function mountTile(entry) {
+  mountNode(entry?.tileNode);
+}
+
+function tileCount() {
+  return els.grid.querySelectorAll('.voice-tile').length;
 }
 
 function updateGridCount() {
-  const count = els.grid.querySelectorAll('.voice-tile').length;
+  const count = tileCount();
   els.grid.dataset.count = String(Math.max(1, Math.min(4, count)));
 }
 
-/** Показывает в плитке актуальный видеотрек (экран приоритетнее камеры). */
-function refreshRemoteVideo(entry) {
-  if (!entry.tileNode) return;
-  const { video, fallback } = entry.tileNode;
+/** Есть ли в сетке хотя бы одно живое видео — от этого зависит раскладка. */
+function hasAnyVideo() {
+  return Boolean(els.grid.querySelector('.voice-tile:not(.voice-tile--empty-video) video:not([hidden])'));
+}
 
-  const usable = (track) => Boolean(track && track.readyState === 'live' && !track.muted);
+const isUsableTrack = (track) => Boolean(track && track.readyState === 'live' && !track.muted);
 
-  let stream = null;
-  if (entry.sharing && usable(entry.screenVideoTrack)) {
-    stream = new MediaStream([entry.screenVideoTrack]);
-  } else if (usable(entry.cameraTrack)) {
-    stream = new MediaStream([entry.cameraTrack]);
-  }
-
+/** Общая отрисовка трека в плитке: включить видео или показать аватар. */
+function paintTile(node, stream) {
+  const { video, fallback } = node;
   const hasVideo = Boolean(stream);
   video.hidden = !hasVideo;
   fallback.hidden = hasVideo;
-  if (hasVideo && video.srcObject !== stream) {
+  if (hasVideo) {
     video.srcObject = stream;
     video.play().catch(() => {});
+    // Кнопка «картинка в картинке»: есть только там, где браузер её умеет
+    attachPictureInPictureButton(node);
+  } else {
+    video.srcObject = null;
   }
-  if (!hasVideo) video.srcObject = null;
+  node.tile.classList.toggle('voice-tile--empty-video', !hasVideo);
+}
+
+/**
+ * Плитка камеры удалённого участника. Экран сюда больше не попадает:
+ * демонстрация живёт в собственной плитке (см. refreshRemoteScreen).
+ */
+function refreshRemoteVideo(entry) {
+  if (!entry?.tileNode) return;
+  const stream = isUsableTrack(entry.cameraTrack) ? new MediaStream([entry.cameraTrack]) : null;
+  paintTile(entry.tileNode, stream);
+}
+
+/**
+ * Отдельная плитка демонстрации экрана собеседника.
+ *
+ * Плитка создаётся здесь же: события приходят в разном порядке — флаг
+ * `screen_state` может обогнать сам видеотрек, поэтому «создать при первом
+ * живом треке» надёжнее, чем создавать заранее по одному флагу.
+ */
+function refreshRemoteScreen(entry) {
+  if (!entry) return;
+
+  const usable = entry.sharing && isUsableTrack(entry.screenVideoTrack);
+  if (!usable) {
+    if (entry.screenTile) {
+      entry.screenTile.tile.remove();
+      entry.screenTile = null;
+      updateGridCount();
+    }
+    return;
+  }
+
+  if (!entry.screenTile) {
+    entry.screenTile = createTile({ userId: entry.userId, username: entry.username, kind: 'screen' });
+    mountNode(entry.screenTile);
+  }
+  const current = entry.screenTile.video.srcObject?.getVideoTracks?.()[0];
+  if (current !== entry.screenVideoTrack) {
+    paintTile(entry.screenTile, new MediaStream([entry.screenVideoTrack]));
+  }
 }
 
 function refreshLocalVideo() {
   const entry = state.localTileEntry;
   if (!entry?.tileNode) return;
-  const { video, fallback } = entry.tileNode;
+  const stream = state.cameraOn && state.cameraStream
+    ? new MediaStream(state.cameraStream.getVideoTracks())
+    : null;
+  paintTile(entry.tileNode, stream);
+}
 
-  const stream = state.screenOn && state.screenStream
-    ? new MediaStream(state.screenStream.getVideoTracks())
-    : state.cameraOn && state.cameraStream
-      ? new MediaStream(state.cameraStream.getVideoTracks())
-      : null;
-
-  video.hidden = !stream;
-  fallback.hidden = Boolean(stream);
-  if (stream) {
-    video.srcObject = stream;
-    video.play().catch(() => {});
-  } else {
-    video.srcObject = null;
+/** Отдельная плитка собственной демонстрации экрана. */
+function refreshLocalScreen() {
+  const show = Boolean(state.screenOn && state.screenStream?.getVideoTracks().length);
+  if (state.localTileEntry) {
+    state.localTileEntry.sharing = show;
+    state.localTileEntry.screenAudioOn = Boolean(state.screenStream?.getAudioTracks().length);
+    updateTileBadges(state.localTileEntry);
   }
+
+  if (!show) {
+    state.localScreenTile?.tile.remove();
+    state.localScreenTile = null;
+    updateGridCount();
+    return;
+  }
+
+  if (!state.localScreenTile) {
+    state.localScreenTile = createTile({
+      userId: 'local', username: CONFIG.username, isLocal: true, kind: 'screen',
+    });
+    mountNode(state.localScreenTile);
+  }
+  paintTile(state.localScreenTile, new MediaStream(state.screenStream.getVideoTracks()));
 }
 
 // ======================================================================
@@ -395,9 +498,17 @@ async function createPeer(userId, username, { initiator }) {
       refreshRemoteVideo(entry);
     } else if (index === 2) {
       entry.screenVideoTrack = track;
-      track.onunmute = () => refreshRemoteVideo(entry);
-      track.onmute = () => refreshRemoteVideo(entry);
-      refreshRemoteVideo(entry);
+      track.onunmute = () => {
+        entry.screenAudioOn = true;
+        refreshRemoteScreen(entry);
+        updateTileBadges(entry);
+      };
+      track.onmute = () => {
+        entry.screenAudioOn = false;
+        refreshRemoteScreen(entry);
+        updateTileBadges(entry);
+      };
+      refreshRemoteScreen(entry);
     } else if (index === 3) {
       entry.screenAudioTrack = track;
       entry.screenAudioOn = true;
@@ -424,7 +535,7 @@ async function createPeer(userId, username, { initiator }) {
 
   // --- плитка ------------------------------------------------------------
   entry.tileNode = createTile({ userId, username });
-  mountTile(userId);
+  mountTile(entry);
   updateTileBadges(entry);
 
   if (initiator) {
@@ -562,6 +673,8 @@ function removePeer(userId) {
   entry.audioEl?.remove();
   entry.screenAudioEl?.remove();
   entry.tileNode?.tile.remove();
+  entry.screenTile?.tile.remove();
+  entry.screenTile = null;
   detachRemoteAnalyser(entry);
   state.peers.delete(userId);
   state.levels.delete(userId);
@@ -712,8 +825,9 @@ function outputVolume() {
   return Math.max(0, Math.min(1, value / 100));
 }
 
-function applyOutputVolume() {
-  const volume = outputVolume();
+/** Громкость чужих голосов: 0, пока включён режим «слышать себя». */
+function applyPeerVolume() {
+  const volume = state.monitorOn ? 0 : outputVolume();
   state.peers.forEach((entry) => {
     if (entry.audioEl) entry.audioEl.volume = volume;
     if (entry.screenAudioEl) entry.screenAudioEl.volume = volume;
@@ -721,6 +835,12 @@ function applyOutputVolume() {
   $$('audio[data-screen-audio]').forEach((node) => {
     node.volume = volume;
   });
+}
+
+function applyOutputVolume() {
+  applyPeerVolume();
+  // Громкость собственного монитора следует за ползунком вывода
+  if (state.monitorOn) applyMonitorGain(!state.muted);
 }
 
 async function applySinkId(element) {
@@ -921,7 +1041,8 @@ export async function joinVoice(slug = state.room) {
   els.joinBlock.hidden = true;
   els.body.hidden = false;
   els.controls.hidden = false;
-  els.pill.hidden = false;
+  els.panel.dataset.joined = 'true';
+  if (els.pill) els.pill.hidden = false;
 
   // Локальная плитка
   state.localTileEntry = {
@@ -930,8 +1051,9 @@ export async function joinVoice(slug = state.room) {
     tileNode: createTile({ userId: 'local', username: CONFIG.username, isLocal: true }),
     muted: false,
     sharing: false,
+    screenAudioOn: false,
   };
-  mountTile('local');
+  mountTile(state.localTileEntry);
   refreshLocalVideo();
 
   // Инициатор — новичок: делаем offer всем, кто уже в канале
@@ -940,10 +1062,13 @@ export async function joinVoice(slug = state.room) {
     if (Number(user.user_id) === CONFIG.userId) continue;
     await createPeer(Number(user.user_id), user.username, { initiator: true });
     if (user.muted) setPeerMuted(user.user_id, true);
-    if (user.sharing) setPeerSharing(user.user_id, true);
+    if (user.sharing) setPeerSharing(user.user_id, true, { hasAudio: user.screen_audio ?? null });
   }
 
-  setVoiceCount(slug, existing.length + 1);
+  setVoiceCount(slug, existing.length + 1, [
+    CONFIG.username,
+    ...existing.map((user) => user.username),
+  ]);
   emit('voice_media_state', { room: slug, muted: false, camera: false });
   updateControls();
   updateVoiceStatus();
@@ -976,6 +1101,9 @@ export async function leaveVoice() {
 
   state.localTileEntry?.tileNode?.tile.remove();
   state.localTileEntry = null;
+  state.localScreenTile?.tile.remove();
+  state.localScreenTile = null;
+  state.monitorOn = false;
 
   state.joined = false;
   state.connecting = false;
@@ -986,9 +1114,11 @@ export async function leaveVoice() {
   els.joinBlock.hidden = false;
   els.body.hidden = false;
   els.controls.hidden = true;
+  els.panel.dataset.joined = 'false';
   els.pill.hidden = true;
 
-  if (slug) setVoiceCount(slug, 0);
+  if (slug) setVoiceCount(slug, 0, []);
+  setVoiceCurrent(null);
   updateControls();
   updateVoiceStatus();
   bus.emit('voice:left', { room: slug });
@@ -1005,9 +1135,16 @@ export function toggleMute() {
     raw.enabled = !state.muted;
   });
 
+  // Во время прослушивания себя микрофон должен оставаться живым локально:
+  // окружающие при этом нас не слышат (трек в звонок выключен выше).
+  if (state.monitorOn) applyMonitorGain(!state.muted);
+
   updateControls();
   updateSpeaking(state.localTileEntry, state.levels.get('local') || 0, state.muted);
-  updateTileBadges({ ...state.localTileEntry, muted: state.muted, sharing: state.screenOn });
+  if (state.localTileEntry) {
+    state.localTileEntry.muted = state.muted;
+    updateTileBadges(state.localTileEntry);
+  }
   emit('voice_media_state', { room: state.room, muted: state.muted, camera: state.cameraOn });
   bus.emit('voice:mute-changed', { muted: state.muted });
   return state.muted;
@@ -1058,9 +1195,11 @@ export async function setScreenState(active, stream = null) {
 
   if (state.localTileEntry) {
     state.localTileEntry.sharing = active;
-    updateTileBadges({ ...state.localTileEntry, muted: state.muted, sharing: active });
+    state.localTileEntry.screenAudioOn = Boolean(audioTrack);
+    updateTileBadges(state.localTileEntry);
   }
   refreshLocalVideo();
+  refreshLocalScreen();
   updateControls();
 
   if (!active) {
@@ -1071,6 +1210,45 @@ export async function setScreenState(active, stream = null) {
     audio: Boolean(active && audioTrack),
   });
   bus.emit('voice:screen-changed', { active });
+}
+
+/**
+ * Громкость монитора внутри графа. 0 — выключено.
+ * Монитор сидит на последнем узле цепочки, поэтому при RNNoise слышно
+ * именно обработанный голос.
+ */
+function applyMonitorGain(on) {
+  const graph = state.audioGraph;
+  if (!graph?.monitor) return;
+  graph.monitor.gain.value = on ? Math.max(0, Math.min(1, outputVolume())) : 0;
+}
+
+/**
+ * «Слышать себя» прямо в звонке.
+ *
+ * Пока режим включён, микрофон не уходит в звонок: собеседники нас не слышат,
+ * а мы не слышим их (их элементы воспроизведения глушатся). Так исключается
+ * акустическая петля «свой микрофон ↔ свой динамик», которая иначе даёт эхо.
+ */
+export function toggleMonitor() {
+  if (!state.joined) return false;
+  state.monitorOn = !state.monitorOn;
+
+  const track = outboundAudioTrack();
+  if (track) track.enabled = state.monitorOn ? false : !state.muted;
+
+  applyMonitorGain(state.monitorOn && !state.muted);
+  applyPeerVolume();
+
+  updateControls();
+  updateTileBadges(state.localTileEntry || {});
+  emit('voice_media_state', { room: state.room, muted: state.muted || state.monitorOn, camera: state.cameraOn });
+  bus.emit('voice:monitor-changed', { active: state.monitorOn });
+  return state.monitorOn;
+}
+
+export function isMonitorOn() {
+  return state.monitorOn;
 }
 
 export function toggleScreen() {
@@ -1095,12 +1273,14 @@ function setPeerMuted(userId, muted) {
   updateTileBadges({ ...entry, muted, sharing: entry.sharing });
 }
 
-function setPeerSharing(userId, sharing) {
+function setPeerSharing(userId, sharing, { hasAudio = null } = {}) {
   const entry = state.peers.get(Number(userId));
   if (!entry) return;
   entry.sharing = sharing;
-  refreshRemoteVideo(entry);
-  updateTileBadges({ ...entry, muted: entry.muted, sharing });
+  if (hasAudio !== null) entry.screenAudioOn = Boolean(hasAudio);
+  if (!sharing) entry.screenAudioOn = false;
+  updateTileBadges(entry);
+  refreshRemoteScreen(entry);
 }
 
 function renderVoiceRoster(users) {
@@ -1148,6 +1328,15 @@ function updateControls() {
   muteBtn.setAttribute('title', t(state.muted ? 'voice.unmute' : 'voice.mute'));
   muteBtn.querySelector('use').setAttribute('href', state.muted ? '#i-mic-off' : '#i-mic');
   muteBtn.classList.toggle('ctrl-btn--danger', state.muted);
+
+  const monitorBtn = els.monitor;
+  if (monitorBtn) {
+    monitorBtn.setAttribute('aria-pressed', String(state.monitorOn));
+    const key = state.monitorOn ? 'voice.monitor_off' : 'voice.monitor_on';
+    monitorBtn.setAttribute('aria-label', t(key));
+    monitorBtn.setAttribute('title', t(key));
+    monitorBtn.classList.toggle('ctrl-btn--active', state.monitorOn);
+  }
 
   const camBtn = els.camera;
   camBtn.setAttribute('aria-pressed', String(state.cameraOn));
@@ -1215,7 +1404,7 @@ function initUI() {
   els.count = $('#voice-count');
   els.secureWarning = $('#voice-secure-warning');
   els.closeBtn = $('#close-voice-panel');
-  els.toggleBtn = $('#toggle-voice-panel');
+  els.monitor = $('#btn-monitor');
 
   if (!els.panel) return;
 
@@ -1229,15 +1418,18 @@ function initUI() {
   });
 
   els.mute.addEventListener('click', () => toggleMute());
+  els.monitor?.addEventListener('click', () => toggleMonitor());
   els.camera.addEventListener('click', () => toggleCamera());
   els.screen.addEventListener('click', () => toggleScreen());
   els.leave.addEventListener('click', () => leaveVoice());
 
   els.closeBtn?.addEventListener('click', () => {
-    els.panel.dataset.open = 'false';
+    bus.emit('voice:close-request');
   });
-  els.toggleBtn?.addEventListener('click', () => {
-    els.panel.dataset.open = els.panel.dataset.open === 'false' ? 'true' : 'false';
+
+  // Плашка «В голосовом канале» в шапке чата возвращает к плиткам
+  els.pill?.addEventListener('click', () => {
+    bus.emit('voice:open-request');
   });
 
   // Показываем предупреждение, если браузер не даст доступ к медиа
@@ -1272,7 +1464,8 @@ function initSocketHandlers() {
   on('voice_roster', (payload) => {
     if (!payload?.users) return;
     if (payload.room === state.room && state.joined) renderVoiceRoster(payload.users);
-    setVoiceCount(payload.room, payload.users.length);
+    // Имена нужны для подсказки у счётчика в сайдбаре
+    setVoiceCount(payload.room, payload.users.length, payload.users.map((user) => user.username));
   });
 
   on('voice_media_state', (payload) => {
@@ -1289,7 +1482,9 @@ function initSocketHandlers() {
   on('screen_state', (payload) => {
     if (payload.room !== state.room) return;
     if (Number(payload.user_id) === CONFIG.userId) return;
-    setPeerSharing(payload.user_id, Boolean(payload.sharing));
+    setPeerSharing(payload.user_id, Boolean(payload.sharing), {
+      hasAudio: payload.audio ?? null,
+    });
   });
 
   on('offer', (payload) => applyOffer(payload));
@@ -1313,16 +1508,22 @@ export function initVoice() {
     }
   });
 
-  bus.on('room:selected', ({ room }) => {
-    if (!room) return;
-    if (!state.room) state.room = room.slug;
+  /**
+   * Клик по голосовому каналу в сайдбаре: открываем голосовую зону на весь
+   * экран и входим в канал. Текстовый чат при этом не переключается —
+   * вернуться к переписке можно кликом по текстовому каналу.
+   */
+  bus.on('room:voice-select', ({ slug }) => {
+    setVoiceCurrent(slug);
+    state.room = state.room || slug;
+    els.panel.dataset.open = 'true';
+    bus.emit('voice:open-request');
+    if (state.joined && state.room !== slug) switchVoiceRoom(slug);
+    else if (!state.joined) joinVoice(slug);
   });
 
-  bus.on('room:voice-select', ({ slug }) => {
-    selectRoom(slug);
-    els.panel.dataset.open = 'true';
-    if (!state.joined) joinVoice(slug);
-  });
+  // Клик по текстовому каналу возвращает чат на место
+  bus.on('room:selected', () => bus.emit('voice:close-request'));
 
   bus.on('settings:changed', (detail) => {
     applySettings(detail || {});
@@ -1364,6 +1565,16 @@ function exposeDebugApi() {
         muted: state.muted,
         cameraOn: state.cameraOn,
         screenOn: state.screenOn,
+        monitorOn: state.monitorOn,
+        layout: getMode(),
+        spotlight: getSpotlight(),
+        tiles: [...els.grid.querySelectorAll('.voice-tile')].map((tile) => ({
+          tile: tile.dataset.tile,
+          kind: tile.dataset.kind,
+          local: tile.dataset.local,
+          spotlight: tile.classList.contains('voice-tile--spotlight'),
+          hasVideo: !tile.querySelector('video')?.hidden,
+        })),
         transceivers: [...state.peers.values()].flatMap((entry) =>
           entry.pc.getTransceivers().map((t, index) => ({
             peer: entry.userId,
@@ -1427,6 +1638,8 @@ function exposeDebugApi() {
         })),
       };
     },
+    /** Внутреннее состояние — только для отладки и E2E. */
+    __state: state,
     /** Возвращает первый RTCPeerConnection — нужен E2E для getStats(). */
     __peerForStats() {
       const first = [...state.peers.values()][0];

@@ -189,13 +189,19 @@ function renderAbout() {
 }
 
 // ------------------------------------------------------- локальный монитор
+/**
+ * Тест микрофона в настройках.
+ *
+ * В звонке собственный захват по-прежнему не запускаем (устройство занято),
+ * но кнопка больше не «мертвая»: подсказка объясняет, что слушать себя можно
+ * кнопкой наушников в голосовой панели.
+ */
 function monitorUi(active) {
   if (!els.monitorBtn) return;
   els.monitorBtn.setAttribute('aria-pressed', String(Boolean(active)));
 
   const label = els.monitorBtn.querySelector('[data-monitor-label]');
   if (label) {
-    // Во время звонка тест недоступен — подпись прямо говорит об этом
     if (state.micInUse) label.dataset.i18n = 'settings.monitor_unavailable';
     else label.dataset.i18n = active ? 'settings.monitor_stop' : 'settings.test_mic';
   }
@@ -204,7 +210,6 @@ function monitorUi(active) {
   els.monitorBtn.setAttribute('aria-disabled', String(state.micInUse));
   applyTranslations(els.monitorBtn);
 
-  // Чекбокс «Слушать себя» тоже неактивен в звонке: устройство занято
   if (els.chkMonitor) {
     els.chkMonitor.disabled = state.micInUse;
     els.chkMonitor.closest('.switch')?.classList.toggle('switch--disabled', state.micInUse);

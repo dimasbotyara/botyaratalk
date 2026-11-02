@@ -96,6 +96,14 @@ class Config:
     LOCALES_DIR = str(LOCALES_DIR)
     SOCKETIO_CORS_ORIGINS = os.environ.get("BOTYARATALK_CORS", "*")
 
+    # Аватарки: загруженные файлы лежат в instance/avatars
+    AVATAR_DIR = str(INSTANCE_DIR / "avatars")
+
+    # HTTPS: самоподписанный сертификат для LAN (см. app/tls.py).
+    # Файлы лежат в instance/ и в git не попадают.
+    HTTPS_CERT_FILE = str(INSTANCE_DIR / "cert.pem")
+    HTTPS_KEY_FILE = str(INSTANCE_DIR / "key.pem")
+
     # WebRTC: TURN не настраиваем — проект про LAN
     ICE_SERVERS = [
         {"urls": ["stun:stun.l.google.com:19302"]},

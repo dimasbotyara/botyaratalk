@@ -1,0 +1,90 @@
+
+<div class="modal modal--avatar" id="avatar-modal" role="dialog" aria-modal="true" aria-labelledby="avatar-title" hidden>
+  <div class="modal__dialog">
+    <header class="modal__header">
+      <svg class="icon" aria-hidden="true"><use href="#i-camera"></use></svg>
+      <h2 class="modal__title" id="avatar-title" data-i18n="avatar.title">Avatar</h2>
+      <button type="button" class="btn btn--icon btn--ghost btn--sm modal__close" data-close-avatar
+              data-i18n-aria-label="a11y.close_settings">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </header>
+
+    <div class="avatar-tabs" role="tablist">
+      <button type="button" class="avatar-tab is-active" role="tab" aria-selected="true"
+              data-avatar-tab="upload" data-i18n="avatar.tab_upload">Upload</button>
+      <button type="button" class="avatar-tab" role="tab" aria-selected="false"
+              data-avatar-tab="generate" data-i18n="avatar.tab_generate">Generate</button>
+    </div>
+
+    <div class="modal__body avatar-body">
+      <!-- upload with in-browser crop -->
+      <section class="avatar-pane" data-avatar-pane="upload">
+        <div class="avatar-crop">
+          <div class="avatar-viewport" id="avatar-viewport">
+            <canvas class="avatar-viewport__canvas" id="avatar-canvas" width="512" height="512"></canvas>
+            <span class="avatar-viewport__hint" data-i18n="avatar.drag_hint">Drag to move</span>
+          </div>
+        </div>
+
+        <div class="avatar-controls">
+          <label class="avatar-file btn btn--sm btn--ghost" for="avatar-file">
+            <svg class="icon" aria-hidden="true"><use href="#i-screen-add"></use></svg>
+            <span data-i18n="avatar.pick">Choose file</span>
+          </label>
+          <input type="file" id="avatar-file" accept="image/png,image/jpeg,image/webp" hidden>
+
+          <label class="avatar-zoom">
+            <svg class="icon" aria-hidden="true"><use href="#i-expand"></use></svg>
+            <input type="range" id="avatar-zoom" min="1" max="3" step="0.01" value="1"
+                   data-i18n-aria-label="avatar.zoom">
+          </label>
+        </div>
+
+        <p class="settings-hint" data-i18n="avatar.upload_hint">PNG, JPEG or WEBP up to 2 MB</p>
+      </section>
+
+      <!-- generator -->
+      <section class="avatar-pane" data-avatar-pane="generate" hidden>
+        <div class="avatar-generator">
+          <img class="avatar-generator__preview" id="avatar-generated" alt=""
+               width="224" height="224">
+
+          <div class="avatar-generator__controls">
+            <div class="avatar-field">
+              <span class="avatar-field__label" data-i18n="avatar.palette">Palette</span>
+              <div class="avatar-palettes" id="avatar-palettes"></div>
+            </div>
+
+            <div class="avatar-field">
+              <label class="avatar-field__label" for="avatar-density">
+                <span data-i18n="avatar.density">Pixels</span>
+                <span class="avatar-field__value" id="avatar-density-value">30%</span>
+              </label>
+              <input type="range" id="avatar-density" min="5" max="55" step="1" value="30">
+            </div>
+
+            <div class="avatar-field">
+              <label class="avatar-field__label" for="avatar-seed" data-i18n="avatar.seed">Seed</label>
+              <div class="avatar-seed">
+                <input type="text" id="avatar-seed" class="input" maxlength="32" spellcheck="false">
+                <button type="button" class="btn btn--icon btn--ghost btn--sm" id="avatar-random"
+                        data-i18n-title="avatar.regenerate" data-i18n-aria-label="avatar.regenerate">
+                  <svg class="icon" aria-hidden="true"><use href="#i-reset"></use></svg>
+                </button>
+              </div>
+              <span class="settings-hint" data-i18n="avatar.seed_hint">Same seed — same pattern</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="modal__footer avatar-footer">
+      <button type="button" class="btn btn--sm btn--ghost" id="avatar-reset" data-i18n="avatar.reset">Reset</button>
+      <div class="avatar-footer__spacer"></div>
+      <button type="button" class="btn btn--ghost btn--sm" data-close-avatar data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="btn btn--primary btn--sm" id="avatar-save" data-i18n="avatar.save">Save</button>
+    </footer>
+  </div>
+</div>

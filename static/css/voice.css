@@ -25,10 +25,14 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--fg-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .voice-panel__count {
-  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .voice-panel__join {
@@ -341,6 +345,8 @@
 /* --- плавающая плашка «вы в голосе» ---------------------------------- */
 .voice-pill {
   display: inline-flex;
+  font-family: inherit;
+  line-height: 1.4;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-1) var(--space-3);
@@ -356,7 +362,18 @@
   height: 6px;
   border-radius: 50%;
   background: currentColor;
-  animation: level-pulse 1.4s infinite;
+}
+
+/* Плашка — кнопка: возвращает к плиткам голосового канала */
+button.voice-pill {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--t-fast);
+}
+
+button.voice-pill:hover {
+  background: color-mix(in srgb, var(--success) 26%, transparent);
 }
 
 /* --- предупреждение о HTTPS ----------------------------------------- */
@@ -410,6 +427,24 @@
   .voice-panel[data-open="true"] {
     transform: none;
   }
+
+  /* На узком экране «закреплённая» и полноэкранная зона занимают всю ширину:
+     иначе панель остаётся 340-пиксельной колонкой справа, а слева — пустота. */
+  .app-shell[data-voice-layout="pinned"] .voice-panel,
+  .app-shell[data-voice-layout="stage"] .voice-panel {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .app-shell[data-voice-layout="pinned"] .voice-grid,
+  .app-shell[data-voice-layout="stage"] .voice-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* На узких плитках от бейджа шаринга остаются только иконки */
@@ -421,4 +456,236 @@
   .voice-tile__badge--sharing {
     padding: 3px 5px;
   }
+}
+
+/* =====================================================================
+   Раскладка голосовой зоны
+   normal  — панель справа (по умолчанию)
+   pinned  — панель закреплена на всю площадь чата
+   stage   — панель развёрнута на весь экран поверх каркаса
+   ===================================================================== */
+/* Обёртка тела панели: держит flex-цепочку «шапка → сетка → контролы»,
+   иначе сетка растягивает панель и кнопки уезжают за нижний край. */
+.voice-stage {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.voice-panel {
+  overflow: hidden;
+}
+
+.voice-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.voice-panel__actions .btn {
+  color: var(--fg-subtle);
+}
+
+.voice-panel__actions .btn[aria-pressed="true"] {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+/* Кнопка «свернуть» внутри развёрнутой панели — только в режиме stage */
+.voice-stage__collapse {
+  display: none;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  margin: var(--space-3) var(--space-3) 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  color: var(--fg-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.voice-stage__collapse:hover {
+  color: var(--fg);
+  border-color: var(--border-strong);
+}
+
+/* --- закрепление: панель занимает весь чат ------------------------- */
+.app-shell[data-voice-layout="pinned"] .app-main .chat,
+.app-shell[data-voice-layout="pinned"] .room-placeholder {
+  display: none;
+}
+
+.app-shell[data-voice-layout="pinned"] .voice-panel {
+  flex: 1 1 auto;
+  width: auto;
+  max-width: none;
+  border-left: none;
+}
+
+.app-shell[data-voice-layout="pinned"] .voice-panel__body {
+  padding: var(--space-4);
+}
+
+/* --- полный экран: панель поверх всего каркаса --------------------- */
+.app-shell[data-voice-layout="stage"] .sidebar {
+  display: none;
+}
+
+.app-shell[data-voice-layout="stage"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-shell[data-voice-layout="stage"] .voice-panel {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  border-left: none;
+  z-index: var(--z-modal, 60);
+}
+
+.app-shell[data-voice-layout="stage"] .voice-stage__collapse {
+  display: inline-flex;
+}
+
+.app-shell[data-voice-layout="stage"] .voice-panel__body {
+  padding: var(--space-5);
+}
+
+.app-shell[data-voice-layout="stage"] .voice-grid {
+  gap: var(--space-4);
+}
+
+/* В полном экране счётчик и список участников прячем: место — плиткам */
+.app-shell[data-voice-layout="stage"] .voice-list {
+  display: none;
+}
+
+/* --- сетка: больше участников видно в развёрнутом режиме ----------- */
+.app-shell[data-voice-layout="pinned"] .voice-grid,
+.app-shell[data-voice-layout="stage"] .voice-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-auto-rows: minmax(160px, 1fr);
+  gap: var(--space-4);
+  align-content: stretch;
+  height: 100%;
+}
+
+/* В развёрнутом режиме плитки тянутся по высоте, а не держат 4:3 */
+.app-shell[data-voice-layout="pinned"] .voice-tile,
+.app-shell[data-voice-layout="stage"] .voice-tile {
+  aspect-ratio: auto;
+  min-height: 160px;
+}
+
+.app-shell[data-voice-layout="pinned"] .voice-panel__body,
+.app-shell[data-voice-layout="stage"] .voice-panel__body {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-shell[data-voice-layout="pinned"] .voice-grid,
+.app-shell[data-voice-layout="stage"] .voice-grid {
+  flex: 1 1 auto;
+}
+
+/* Список участников нужен только до входа в канал: после входа его роль
+   выполняют плитки, а дублирование занимает место. */
+.voice-panel[data-joined="true"] .voice-list {
+  display: none;
+}
+
+.app-shell[data-voice-layout="pinned"] .voice-grid[data-count="1"],
+.app-shell[data-voice-layout="stage"] .voice-grid[data-count="1"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* --- плитка как кнопка -------------------------------------------- */
+.voice-tile[tabindex] {
+  cursor: pointer;
+}
+
+.voice-tile--screen video {
+  object-fit: contain;
+  background: var(--bg-inset);
+}
+
+.voice-tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* =====================================================================
+   Спотлайт: главная плитка сверху, остальные — полосой снизу
+   ===================================================================== */
+.app-shell[data-voice-layout="pinned"] .voice-grid[data-spotlight="1"],
+.app-shell[data-voice-layout="stage"] .voice-grid[data-spotlight="1"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-content: flex-start;
+  height: 100%;
+}
+
+.voice-grid[data-spotlight="1"] .voice-tile--spotlight {
+  order: -1;
+  flex: 1 0 100%;
+  aspect-ratio: 16 / 9;
+  max-height: none;
+  min-height: 0;
+  height: calc(100% - 150px);
+}
+
+.voice-grid[data-spotlight="1"] .voice-tile:not(.voice-tile--spotlight) {
+  flex: 0 1 auto;
+  width: 132px;
+  aspect-ratio: 4 / 3;
+  opacity: 0.92;
+}
+
+.voice-grid[data-spotlight="1"] .voice-tile:not(.voice-tile--spotlight):hover {
+  opacity: 1;
+}
+
+/* =====================================================================
+   Кнопка «картинка в картинке» на плитке с видео
+   ===================================================================== */
+.voice-tile__pip {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-inset) 80%, transparent);
+  color: var(--fg);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--t-fast), background var(--t-fast);
+}
+
+.voice-tile:hover .voice-tile__pip,
+.voice-tile__pip:focus-visible {
+  opacity: 1;
+}
+
+.voice-tile__pip:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.voice-tile__pip .icon {
+  width: 16px;
+  height: 16px;
 }

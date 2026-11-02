@@ -1,0 +1,112 @@
+/* Контекстное меню сообщения и полоска быстрых реакций. */
+
+.ctx-menu {
+  position: fixed;
+  z-index: 1200;
+  min-width: 190px;
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-alt);
+  box-shadow: var(--shadow-lg, 0 12px 40px rgb(0 0 0 / 0.35));
+  animation: ctx-in 120ms ease-out;
+}
+
+.ctx-menu[hidden] {
+  display: none;
+}
+
+@keyframes ctx-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctx-menu { animation: none; }
+}
+
+.ctx-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ctx-menu__item:hover:not(:disabled),
+.ctx-menu__item:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+
+.ctx-menu__item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ctx-menu__item--danger {
+  color: var(--danger, #e78284);
+}
+
+.ctx-menu__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--fg-muted);
+}
+
+.ctx-menu__icon .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.ctx-menu__label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Полоска эмодзи */
+.ctx-menu__emojis {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+}
+
+.ctx-menu__emoji {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--t-fast), transform var(--t-fast);
+}
+
+.ctx-menu__emoji:hover,
+.ctx-menu__emoji:focus-visible {
+  background: var(--hover);
+  transform: translateY(-2px);
+  outline: none;
+}
+
+/* На тач-устройствах меню удобнее крупнее */
+@media (hover: none) {
+  .ctx-menu__item {
+    padding: var(--space-3);
+    font-size: var(--fs-md);
+  }
+
+  .ctx-menu__emoji {
+    width: 40px;
+    height: 40px;
+  }
+}

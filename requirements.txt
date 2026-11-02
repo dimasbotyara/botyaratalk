@@ -22,3 +22,6 @@ gevent==26.9.0
 greenlet==3.5.6
 zope.event==6.2
 zope.interface==8.7
+
+# TLS: самоподписанный сертификат для LAN (app/tls.py)
+cryptography>=42

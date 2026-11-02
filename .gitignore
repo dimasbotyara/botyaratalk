@@ -23,6 +23,18 @@ instance/
 *.db-shm
 secret.key
 
+# --- TLS-сертификаты (создаются автоматически при первом запуске) ---
+*.pem
+cert.pem
+key.pem
+
+# --- рабочая документация и черновики ---
+# README.md и LICENSE остаются в репозитории
+AUDIT.md
+DECISIONS.md
+*.check-*.png
+.mob-*.png
+
 # --- тесты, покрытие, кеши ---
 .pytest_cache/
 .ruff_cache/
@@ -46,6 +58,3 @@ Thumbs.db
 .env
 .env.*
 *.log
-key.pem
-cert.pem
-*.pem

@@ -11,8 +11,10 @@ import { t } from './i18n.js';
 
 const state = {
   rooms: [],
-  current: null,
+  current: null,        // открытая текстовая комната
+  voiceCurrent: null,   // открытый голосовой канал (может совпадать с current)
   voiceCounts: new Map(),
+  voiceUsers: new Map(), // slug -> [username] — для подсказки у счётчика
 };
 
 const els = {};
@@ -117,6 +119,14 @@ function buildChannelRow(room, kind) {
 
   if (isText) {
     row.addEventListener('click', () => selectRoom(room.slug));
+  } else {
+    // Голосовой канал открывает голосовую панель на весь экран и НЕ трогает
+    // текстовый чат — раньше клик по «голос-1» переключал ещё и чат.
+    row.addEventListener('click', () => {
+      state.voiceCurrent = room.slug;
+      highlightCurrent();
+      bus.emit('room:voice-select', { slug: room.slug, room });
+    });
   }
   return row;
 }
@@ -128,8 +138,9 @@ function highlightCurrent() {
     if (active) node.setAttribute('aria-current', 'page');
     else node.removeAttribute('aria-current');
   });
+  // Голосовая строка подсвечивается только если голос реально открыт
   document.querySelectorAll('[data-voice-room]').forEach((node) => {
-    node.setAttribute('aria-pressed', String(node.dataset.voiceRoom === state.current));
+    node.setAttribute('aria-pressed', String(node.dataset.voiceRoom === state.voiceCurrent));
   });
 }
 
@@ -141,6 +152,11 @@ export function renderRooms() {
   list.append(buildCategory('voice'));
   highlightCurrent();
   updateVoiceIndicators();
+  // Счётчики и подсказки после перерисовки восстанавливаем из состояния
+  state.rooms.forEach((room) => {
+    const count = state.voiceCounts.get(room.slug) || 0;
+    setVoiceCount(room.slug, count);
+  });
   // Бейджи могли накопиться до перерисовки
   bus.emit('notifications:refresh-badges');
 }
@@ -178,18 +194,43 @@ export function selectRoom(slug, { silent = false } = {}) {
 }
 
 /** Обновляет счётчик голосовых участников в сайдбаре. */
-export function setVoiceCount(slug, count) {
+export function setVoiceCount(slug, count, users = null) {
   state.voiceCounts.set(slug, count);
+  if (Array.isArray(users)) state.voiceUsers.set(slug, users);
 
   const badge = document.querySelector(`[data-voice-count="${slug}"]`);
   if (badge) {
     badge.textContent = String(count);
     badge.hidden = count === 0;
+    applyVoiceTooltip(slug, badge);
   }
   const dot = document.querySelector(`[data-voice-dot="${slug}"]`);
   if (dot) dot.hidden = count === 0;
 
   updateVoiceIndicators();
+}
+
+/**
+ * Подсказка у счётчика: имя канала + список участников.
+ * При наведении на «2» в сайдбаре видно, кто именно сидит в канале.
+ */
+function applyVoiceTooltip(slug, badge) {
+  const room = getRoom(slug);
+  if (!room) return;
+  const users = state.voiceUsers.get(slug) || [];
+  const title = t(room.name_key || `room.${slug}`);
+  badge.title = users.length ? `${title}\n${users.join('\n')}` : title;
+  badge.setAttribute('aria-label', users.length ? `${title}: ${users.join(', ')}` : title);
+}
+
+/** Запоминает, какой голосовой канал открыт на весь экран (подсветка). */
+export function setVoiceCurrent(slug) {
+  state.voiceCurrent = slug;
+  highlightCurrent();
+}
+
+export function getVoiceCurrent() {
+  return state.voiceCurrent;
 }
 
 function updateVoiceIndicators() {

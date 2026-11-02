@@ -91,6 +91,7 @@ def start_server(port: int, db_path: Path) -> subprocess.Popen:
         "BOTYARATALK_ASYNC_MODE": "threading",
         "BOTYARATALK_DB": f"sqlite:///{db_path}",
         "BOTYARATALK_SECRET_KEY": "screenshots-secret",
+        "BOTYARATALK_HTTPS": "0",
     }
     process = subprocess.Popen(
         [sys.executable, str(ROOT / "run.py")],
@@ -195,6 +196,67 @@ class Shooter:
     def switch_language(self, lang: str) -> None:
         self.page.click(f'#lang-switch [data-lang-option="{lang}"]')
         self.settle(600)
+
+    def send_message_with_reply(self, text: str, previous_text: str) -> None:
+        """Отвечает на сообщение с текстом ``previous_text`` через ПКМ-меню."""
+        row = self.page.locator(".msg", has_text=previous_text).first
+        row.click(button="right")
+        self.page.wait_for_selector(".ctx-menu:not([hidden])", timeout=3000)
+        self.page.click("[data-action='reply']")
+        self.page.fill("#composer-input", text)
+        self.page.click("#composer-send")
+        self.settle(700)
+
+    def add_reaction(self, message_text: str, emoji: str = "👍") -> None:
+        row = self.page.locator(".msg", has_text=message_text).first
+        row.click(button="right")
+        self.page.wait_for_selector(".ctx-menu:not([hidden])", timeout=3000)
+        self.page.click("[data-action='react']")
+        self.settle(250)
+        self.page.click(f".ctx-menu__emoji[title='{emoji}']")
+        self.settle(600)
+
+    def open_avatar_editor(self) -> None:
+        self.open_settings()
+        self.open_settings_tab("about")
+        self.page.click("#open-avatar-editor")
+        self.page.wait_for_selector("#avatar-modal:not([hidden])", timeout=5000)
+        self.settle(700)
+
+    def close_avatar_editor(self) -> None:
+        self.page.click("[data-close-avatar]")
+        self.settle(400)
+
+    def crop_demo_image(self) -> None:
+        """Подставляет в редактор картинку, чтобы видно было именно обрезку."""
+        png = self.page.evaluate(
+            """() => {
+                const c = document.createElement('canvas');
+                c.width = 800; c.height = 500;
+                const ctx = c.getContext('2d');
+                const g = ctx.createLinearGradient(0, 0, 800, 500);
+                g.addColorStop(0, '#cba6f7');
+                g.addColorStop(1, '#89dceb');
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, 800, 500);
+                ctx.fillStyle = '#1e1e2e';
+                ctx.beginPath();
+                ctx.arc(300, 250, 140, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#a6e3a1';
+                ctx.fillRect(480, 120, 220, 260);
+                return c.toDataURL('image/png').split(',')[1];
+            }"""
+        )
+        import base64
+
+        self.page.set_input_files(
+            "#avatar-file",
+            files=[{"name": "demo.png", "mimeType": "image/png", "buffer": base64.b64decode(png)}],
+        )
+        self.settle(600)
+        self.page.eval_on_selector("#avatar-zoom", "el => { el.value = '1.4'; el.dispatchEvent(new Event('input')); }")
+        self.settle(400)
 
     def seed_history(self, messages: list[tuple[str, str]]) -> None:
         """Отправляет несколько сообщений, чтобы лента выглядела живой."""
@@ -303,6 +365,34 @@ def run() -> int:
             shooter.send_message("Hello from Playwright")
             shooter.shoot("chat-with-message.png")
 
+            # Чат: markdown, ссылка с карточкой, ответ и реакции
+            shooter.send_message("**Release 1.0** is out — changelog: example.com")
+            shooter.settle(900)  # даём серверу вытащить <title> для карточки
+            shooter.send_message_with_reply("Nice, thanks for the link!", "Release 1.0")
+            shooter.add_reaction("Nice, thanks", "🔥")
+            shooter.add_reaction("Release 1.0", "👍")
+            shooter.shoot("chat-reply-reactions.png")
+
+            # Контекстное меню сообщения
+            shooter.page.locator(".msg").last.click(button="right")
+            shooter.page.wait_for_selector(".ctx-menu:not([hidden])", timeout=3000)
+            shooter.settle(300)
+            shooter.shoot("chat-context-menu.png")
+            shooter.page.keyboard.press("Escape")
+            shooter.settle(250)
+
+            # Аватарка: обрезка загруженной картинки
+            shooter.open_avatar_editor()
+            shooter.crop_demo_image()
+            shooter.shoot("avatar-upload.png")
+
+            # Аватарка: генератор пиксельного узора
+            shooter.page.click("[data-avatar-tab='generate']")
+            shooter.settle(900)
+            shooter.shoot("avatar-generate.png")
+            shooter.close_avatar_editor()   # возвращает нас в настройки
+            shooter.close_settings()
+
             # Настройки: устройства
             shooter.open_settings()
             shooter.shoot("settings-devices.png")
@@ -368,6 +458,20 @@ def run() -> int:
                     other.settle(2600)
                     shooter.settle(1200)
                     shooter.shoot("app-screen-sharing.png")
+
+                    # --- развёрнутая голосовая зона: спотлайт на демонстрации ---
+                    shooter.page.click('[data-voice-room="channel-2"]')
+                    shooter.settle(600)
+                    shooter.page.click('.voice-tile[data-kind="screen"]')
+                    shooter.settle(900)
+                    shooter.shoot("app-voice-pinned.png")
+
+                    # --- полный экран голосовой зоны ---
+                    shooter.page.click("#voice-fullscreen")
+                    shooter.settle(900)
+                    shooter.shoot("app-voice-fullscreen.png")
+                    shooter.page.keyboard.press("Escape")
+                    shooter.settle(500)
                 finally:
                     other_context.close()
 

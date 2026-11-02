@@ -58,6 +58,8 @@ def start_server() -> tuple[subprocess.Popen, Path]:
         "BOTYARATALK_HOST": "127.0.0.1",
         "BOTYARATALK_SECRET_KEY": "e2e-secret",
         "BOTYARATALK_DB": f"sqlite:///{db_path}",
+        # E2E ходит по http://127.0.0.1 — HTTPS для этих прогонов не нужен
+        "BOTYARATALK_HTTPS": "0",
     }
     process = subprocess.Popen(
         [sys.executable, str(ROOT / "run.py")],
@@ -169,9 +171,22 @@ def main() -> int:
                 check("Alice получает видеотрек экрана", sa["peers"][0]["inboundScreen"] == "live")
                 check("флаг sharing доехал", sa["peers"][0]["sharing"])
                 check(
-                    "бейдж «Демонстрация экрана»",
+                    "демонстрация — отдельная плитка (не подменяет камеру)",
                     alice.evaluate(
-                        "!!document.querySelector('.voice-tile[data-tile=\"2\"] .voice-tile__badge--sharing')"
+                        """() => {
+                            const tiles = [...document.querySelectorAll('.voice-tile')];
+                            const screen = tiles.filter((t) => t.dataset.kind === 'screen');
+                            const camera = tiles.filter((t) => t.dataset.tile === '2');
+                            return screen.length === 1 && camera.length === 1
+                                && !screen[0].querySelector('video').hidden
+                                && !camera[0].querySelector('video').hidden;
+                        }"""
+                    ),
+                )
+                check(
+                    "бейдж «Демонстрация экрана» на плитке экрана",
+                    alice.evaluate(
+                        "!!document.querySelector('.voice-tile[data-tile=\"2-screen\"] .voice-tile__badge--sharing')"
                     ),
                 )
 
@@ -217,12 +232,59 @@ def main() -> int:
                     f"{screen_audio_stats[0]['bytesReceived'] if screen_audio_stats else 0} байт",
                 )
 
-                print("\n[5] остановка шаринга")
+                # --- раскладка: клик по голосовому каналу и полный экран ---
+                print("\n[5] раскладка голосовой зоны")
+                title_before = alice.text_content("#room-title")
+                alice.click('[data-voice-room="channel-1"]')
+                alice.wait_for_timeout(700)
+                check(
+                    "голосовой канал не переключает текстовый чат",
+                    alice.text_content("#room-title") == title_before
+                    and alice.evaluate("getComputedStyle(document.querySelector('#chat')).display === 'none'")
+                    and snapshot(alice)["layout"] in {"pinned", "stage"},
+                )
+
+                alice.click("#voice-fullscreen")
+                alice.wait_for_timeout(400)
+                check("полный экран включается", snapshot(alice)["layout"] == "stage")
+
+                alice.click('.voice-tile[data-kind="screen"]')
+                alice.wait_for_timeout(400)
+                check("клик по плитке делает её главной", snapshot(alice)["spotlight"] == "2-screen")
+
+                alice.keyboard.press("Escape")
+                alice.wait_for_timeout(300)
+                check("Esc сворачивает из полного экрана", snapshot(alice)["layout"] == "pinned")
+
+                # --- «слышать себя»: собеседники не слышат, мы не слышим их ---
+                print("\n[6] прослушивание себя в звонке")
+                alice.click("#btn-monitor")
+                alice.wait_for_timeout(600)
+                check("монитор включился", snapshot(alice)["monitorOn"])
+                check("Bob видит Alice как выключенную", snapshot(bob)["peers"][0]["muted"])
+                alice.click("#btn-monitor")
+                alice.wait_for_timeout(600)
+                check("монитор выключился", not snapshot(alice)["monitorOn"])
+
+                # --- возврат к текстовому чату ---
+                alice.click('[data-room="channel-2"]')
+                alice.wait_for_timeout(600)
+                check(
+                    "клик по текстовому каналу возвращает чат",
+                    alice.evaluate(
+                        """() => document.querySelector('#app-shell').dataset.voiceLayout === 'normal'
+                            && getComputedStyle(document.querySelector('#chat')).display !== 'none'"""
+                    ),
+                )
+                alice.click('[data-room="channel-1"]')
+                alice.wait_for_timeout(500)
+
+                print("\n[7] остановка шаринга")
                 bob.click("#btn-screen")
                 bob.wait_for_timeout(1800)
                 check("флаг sharing снят", not snapshot(alice)["peers"][0]["sharing"])
 
-                print("\n[6] выход")
+                print("\n[8] выход")
                 alice.click("#btn-leave")
                 alice.wait_for_timeout(1500)
                 check("Alice вышла", not snapshot(alice)["joined"])

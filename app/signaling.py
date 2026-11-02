@@ -25,6 +25,7 @@ class VoicePeer:
     muted: bool = False
     camera: bool = False
     sharing: bool = False
+    screen_audio: bool = False  # демонстрация со звуком системы/вкладки
     joined_at: float = 0.0
 
     def to_public(self) -> dict:
@@ -34,6 +35,7 @@ class VoicePeer:
             "muted": self.muted,
             "camera": self.camera,
             "sharing": self.sharing,
+            "screen_audio": self.screen_audio,
         }
 
 
@@ -59,13 +61,23 @@ class VoiceRegistry:
         self.max_participants = max_participants
 
     # --- вход/выход -----------------------------------------------------
-    def join(self, slug: str, user_id: int, username: str, sid: str, now: float = 0.0) -> tuple[list[dict], bool]:
-        """Добавляет участника.
+    def join(
+        self, slug: str, user_id: int, username: str, sid: str, now: float = 0.0
+    ) -> tuple[list[dict], bool]:
+        """Добавляет участника в комнату.
 
         Возвращает ``(список участников до входа, вошёл_ли_впервые)``.
-        Если пользователь уже в комнате — просто обновляем sid.
+        Если пользователь уже в этой комнате — просто обновляем sid.
+
+        ВАЖНО: один пользователь занимает ровно одно место во всём реестре.
+        Без этого при переходе «канал 1 → канал 2 → канал 3» из-за гонки
+        оставались призраки: в старых комнатах тот же человек продолжал
+        висеть, и получалось «два меня в двух каналах».
         """
         with self._lock:
+            # Сначала вычищаем пользователя из всех остальных голосовых комнат
+            self._remove_user_everywhere(user_id, keep=slug)
+
             room = self._rooms.setdefault(slug, VoiceRoom(slug=slug))
             existing = room.peers.get(user_id)
             if existing:
@@ -81,6 +93,35 @@ class VoiceRegistry:
                 user_id=user_id, username=username, sid=sid, joined_at=now
             )
             return before, True
+
+    def _remove_user_everywhere(self, user_id: int, keep: str | None = None) -> list[str]:
+        """Убирает пользователя из всех комнат, кроме ``keep``.
+
+        Возвращает список комнат, из которых он реально выпал — по ним нужно
+        разослать ``voice_user_left`` и обновлённый ростер.
+        """
+        dropped: list[str] = []
+        for slug, room in list(self._rooms.items()):
+            if slug == keep or user_id not in room.peers:
+                continue
+            del room.peers[user_id]
+            dropped.append(slug)
+            if not room.peers:
+                self._rooms.pop(slug, None)
+        return dropped
+
+    def switch(self, from_slug: str, to_slug: str, user_id: int, username: str, sid: str,
+               now: float = 0.0) -> tuple[dict, list[dict], bool]:
+        """Атомарно переводит пользователя из канала в канал.
+
+        Возвращает ``(снимок старой комнаты, участники новой, вошёл_ли_впервые)``.
+        Обе операции идут под одним локом, поэтому промежуточное состояние
+        «я сразу в двух каналах» недостижимо.
+        """
+        with self._lock:
+            left = self.leave(from_slug, user_id)
+            before, is_new = self.join(to_slug, user_id, username, sid, now=now)
+            return {"left": left}, before, is_new
 
     def leave(self, slug: str, user_id: int) -> bool:
         """Убирает участника; True — если он действительно был в канале."""
@@ -110,7 +151,7 @@ class VoiceRegistry:
         return removed
 
     def set_flag(self, slug: str, user_id: int, flag: str, value: bool) -> bool:
-        """Меняет флаг участника (muted / camera / sharing)."""
+        """Меняет флаг участника (muted / camera / sharing / screen_audio)."""
         with self._lock:
             room = self._rooms.get(slug)
             peer = room.peers.get(user_id) if room else None
@@ -130,7 +171,12 @@ class VoiceRegistry:
             room = self._rooms.get(slug)
             return room.peers.get(user_id) if room else None
 
-    def rooms_of(self, sid: str) -> list[str]:
+    def rooms_of_user(self, user_id: int) -> list[str]:
+        """Все комнаты, где сейчас числится пользователь (для отладки и чистки)."""
+        with self._lock:
+            return [slug for slug, room in self._rooms.items() if user_id in room.peers]
+
+    def rooms_of_sid(self, sid: str) -> list[str]:
         with self._lock:
             return [slug for slug, room in self._rooms.items() if any(p.sid == sid for p in room.peers.values())]
 
