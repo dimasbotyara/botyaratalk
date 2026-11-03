@@ -108,9 +108,13 @@ def test_onboarding_page_renders(client):
     response = client.get("/onboarding")
     assert response.status_code == 200
     body = response.get_data(as_text=True)
+    # Порядок шагов: язык → аккаунт (вход или регистрация) → тема
     assert "data-panel=\"lang\"" in body
+    assert "data-panel=\"account\"" in body
     assert "data-panel=\"theme\"" in body
-    assert "data-panel=\"register\"" in body
+    # На шаге аккаунта есть обе вкладки — иначе войти было бы невозможно
+    assert 'data-account-mode="login"' in body
+    assert 'data-account-mode="register"' in body
     # Никаких русских строк в разметке — только data-i18n
     assert "Выберите язык" not in body
 

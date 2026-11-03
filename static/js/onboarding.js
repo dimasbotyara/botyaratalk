@@ -1,19 +1,24 @@
 /**
- * Онбординг: язык → тема (с живым предпросмотром) → регистрация.
+ * Онбординг: язык → аккаунт (вход ИЛИ регистрация) → тема.
  *
- * Тема применяется «вживую» при клике по карточке (без сохранения), кнопка
- * «Применить» фиксирует выбор в localStorage/cookie, а сервер по факту
- * регистрации ставит httpOnly-cookie botyaratalk_onboarded.
+ * Порядок шагов важен: сначала человек выбирает язык (на нём говорит мастер),
+ * потом входит в существующий аккаунт или создаёт новый, и только в конце
+ * выбирает тему — она применяется ко всему приложению и к самому мастеру.
+ *
+ * Сервер по факту успешного входа/регистрации ставит httpOnly-cookie сессии
+ * и cookie botyaratalk_onboarded — после этого просто уходим в /app.
  */
 
 import { CONFIG, $, $$, fetchJSON, setCookie, storage, toast } from './utils.js';
 import { applyTranslations, detectLang, initI18n, setLang, t } from './i18n.js';
 import { applyTheme, currentTheme, markSelectedCard, renderThemeGrid } from './theme.js';
+import { MIN_PASSWORD_LENGTH, bindPasswordToggles, passwordStrength, updateStrengthMeter } from './password.js';
 
-const STEPS = ['lang', 'theme', 'register'];
+const STEPS = ['lang', 'account', 'theme'];
 const state = {
   step: 'lang',
   lang: null,
+  mode: 'login', // 'login' | 'register'
   theme: currentTheme(),
   confirmedTheme: currentTheme(),
   busy: false,
@@ -65,6 +70,7 @@ async function confirmLang() {
 // ----------------------------------------------------------------- темы
 function renderThemeStep() {
   const grid = $('#theme-groups');
+  if (!grid) return;
   renderThemeGrid(grid, {
     selected: state.theme,
     onSelect: (name) => {
@@ -93,34 +99,76 @@ function confirmTheme() {
   toast(t('settings.saved'));
 }
 
-// ------------------------------------------------------------ регистрация
-function passwordStrength(value) {
-  let score = 0;
-  if (value.length >= 6) score += 1;
-  if (value.length >= 10) score += 1;
-  if (/[A-Za-z]/.test(value) && /\d/.test(value)) score += 1;
-  if (/[^\w\s]/.test(value)) score += 1;
-  return Math.min(3, Math.max(value ? 1 : 0, score - 1));
+// ------------------------------------------------------------- аккаунт
+/** Переключение «войти / зарегистрироваться» без перезагрузки. */
+function switchMode(mode) {
+  if (!['login', 'register'].includes(mode)) return;
+  state.mode = mode;
+
+  const form = $('#onboarding-form');
+  form.dataset.mode = mode;
+
+  $$('[data-account-mode]').forEach((tab) => {
+    const active = tab.dataset.accountMode === mode;
+    tab.classList.toggle('is-active', active);
+    tab.setAttribute('aria-selected', String(active));
+  });
+
+  const repeat = $('#ob-password2-field');
+  if (repeat) repeat.hidden = mode !== 'register';
+
+  // Подсказка о сложности нужна только при создании пароля
+  const strength = $('#ob-strength');
+  if (strength && mode !== 'register') strength.hidden = true;
+
+  const password = $('#ob-password');
+  password.autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+
+  const label = $('#ob-submit-label');
+  if (label) {
+    label.dataset.i18n = mode === 'login' ? 'auth.submit_login' : 'onboarding.register.action';
+    label.textContent = t(label.dataset.i18n);
+  }
+
+  const title = $('#ob-account-title');
+  if (title) {
+    title.dataset.i18n = mode === 'login' ? 'onboarding.login.title' : 'onboarding.register.title';
+    title.textContent = t(title.dataset.i18n);
+  }
+
+  // При входе повторный пароль не нужен и не должен мешать валидации
+  const repeatInput = $('#ob-password2');
+  if (repeatInput && mode === 'login') repeatInput.value = '';
+
+  setError('');
 }
 
-function updatePasswordMeter(value) {
-  const strength = passwordStrength(value);
-  $$('.password-meter__bar').forEach((bar, index) => {
-    bar.dataset.filled = String(strength >= index + 1 ? Math.min(strength, 3) : 0);
-  });
+/** Обновляет индикатор сложности под полем пароля. */
+function updateStrength(value) {
+  updateStrengthMeter($('#ob-strength'), $('#ob-strength-label'), value, state.mode === 'register');
 }
 
 function updatePreview(username) {
-  $('#ob-preview-name').textContent = username || '—';
+  const name = $('#ob-preview-name');
+  if (name) name.textContent = username || '—';
   const avatar = $('#ob-preview-avatar');
-  avatar.textContent = (username || '?').slice(0, 2).toUpperCase();
+  if (avatar) avatar.textContent = (username || '?').slice(0, 2).toUpperCase();
 }
 
 function setError(message) {
-  $('#ob-error').textContent = message || '';
+  const node = $('#ob-error');
+  if (node) node.textContent = message || '';
 }
 
-async function register(event) {
+function setBusy(busy) {
+  state.busy = busy;
+  const submit = $('#ob-submit');
+  if (!submit) return;
+  submit.disabled = busy;
+  submit.setAttribute('aria-busy', String(busy));
+}
+
+async function submitAccount(event) {
   event.preventDefault();
   if (state.busy) return;
 
@@ -129,33 +177,37 @@ async function register(event) {
   const password2 = $('#ob-password2').value;
 
   if (username.length < 3) return setError(t('auth.err_username'));
-  if (password.length < 6) return setError(t('auth.err_password_short', { min: 6 }));
-  if (password !== password2) return setError(t('auth.err_password_mismatch'));
+  if (password.length < MIN_PASSWORD_LENGTH) return setError(t('auth.err_password_short', { min: MIN_PASSWORD_LENGTH }));
+  if (state.mode === 'register' && password !== password2) {
+    return setError(t('auth.err_password_mismatch'));
+  }
 
   setError('');
-  state.busy = true;
-  const submit = $('#ob-submit');
-  submit.disabled = true;
-  submit.setAttribute('aria-busy', 'true');
+  setBusy(true);
 
-  const result = await fetchJSON(CONFIG.urls.register, {
+  const isRegister = state.mode === 'register';
+  const result = await fetchJSON(isRegister ? CONFIG.urls.register : CONFIG.urls.login, {
     method: 'POST',
-    body: { username, password, password2 },
+    body: isRegister ? { username, password, password2 } : { username, password },
   });
 
-  state.busy = false;
-  submit.disabled = false;
-  submit.removeAttribute('aria-busy');
+  setBusy(false);
 
   if (!result.ok) {
     setError(result.error && !String(result.error).startsWith('http_') ? result.error : t('auth.err_network'));
     return;
   }
 
-  // Страховка: если сервер не поставил httpOnly-cookie (например, старый
-  // билд), ставим клиентскую — навигация всё равно продолжится.
+  // Успех: сервер уже поставил сессию. Осталось сохранить выбор и перейти к теме.
   setCookie('botyaratalk_onboarded', '1');
   storage.set('lang', state.lang);
+  goTo('theme', { focus: false });
+  toast(t(isRegister ? 'onboarding.register.done' : 'auth.signed_in'));
+}
+
+/** Последний шаг: сохраняем тему и уходим в приложение. */
+function finish() {
+  confirmTheme();
   storage.set('theme', state.confirmedTheme);
   window.location.assign(CONFIG.urls.app);
 }
@@ -167,6 +219,7 @@ async function init() {
   selectLang(detected);
   applyTheme(currentTheme(), { persist: false });
   renderThemeStep();
+  switchMode('login');
   goTo('lang', { focus: false });
 
   $$('[data-lang-choice]').forEach((card) => {
@@ -177,10 +230,7 @@ async function init() {
     btn.addEventListener('click', async () => {
       if (btn.dataset.from === 'lang') {
         await confirmLang();
-        goTo('theme', { focus: false });
-      } else if (btn.dataset.from === 'theme') {
-        confirmTheme();
-        goTo('register');
+        goTo(btn.dataset.to || 'account', { focus: false });
       }
     });
   });
@@ -189,24 +239,29 @@ async function init() {
     btn.addEventListener('click', () => goTo(btn.dataset.to));
   });
 
+  const finishBtn = $('[data-action="finish"]');
+  if (finishBtn) finishBtn.addEventListener('click', finish);
+
   // «Применить» — фиксирует тему, не уходя со шага
   const applyBtn = $('#apply-theme');
   if (applyBtn) applyBtn.addEventListener('click', confirmTheme);
 
-  $('#ob-username').addEventListener('input', (event) => updatePreview(event.target.value.trim()));
-  $('#ob-password').addEventListener('input', (event) => updatePasswordMeter(event.target.value));
-  $('#onboarding-form').addEventListener('submit', register);
-
-  // Escape из последнего шага никуда не ведёт — визард обязателен
-  document.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter' || event.target.tagName === 'TEXTAREA') return;
-    if (state.step !== 'register' && event.target.tagName !== 'BUTTON') return;
+  // Вход / регистрация
+  $$('[data-account-mode]').forEach((tab) => {
+    tab.addEventListener('click', () => switchMode(tab.dataset.accountMode));
   });
+
+  $('#ob-username').addEventListener('input', (event) => updatePreview(event.target.value.trim()));
+  $('#ob-password').addEventListener('input', (event) => updateStrength(event.target.value));
+  $('#onboarding-form').addEventListener('submit', submitAccount);
+
+  bindPasswordToggles();
 
   // Показываем актуальные подписи после смены языка
   applyTranslations(document);
+  switchMode('login');
 }
 
 document.addEventListener('DOMContentLoaded', init);
 
-export { goTo, selectLang, confirmTheme, passwordStrength };
+export { goTo, selectLang, confirmTheme, switchMode, passwordStrength };

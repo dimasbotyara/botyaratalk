@@ -17,6 +17,8 @@ import {
   isSecureEnoughForMedia, mediaDevices, storage, stopStream, throttle,
 } from './utils.js';
 import { t } from './i18n.js';
+import { buildAvatar } from './message.js';
+import { currentUser } from './user.js';
 import { emit, on, request } from './socket.js';
 import { createRnnoiseNode, destroyRnnoiseNode, rnnoiseInfo } from './noise.js';
 import { getRoom, setVoiceCount, setVoiceCurrent } from './rooms.js';
@@ -34,7 +36,10 @@ const state = {
   cameraOn: false,
   screenOn: false,
   iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }],
-  peers: new Map(), // userId -> peer entry
+  selfSid: null, // sid нашего собственного сокета (устройства)
+  peers: new Map(), // sid устройства -> peer entry (ключ именно sid:
+  // один человек может быть в канале с телефона и ноутбука, и это два
+  // независимых WebRTC-соединения с отдельными плитками-дорожками)
   localStream: null, // сырой микрофон
   sendStream: null, // обработанный (gain) — уходит в звонок
   cameraStream: null,
@@ -47,8 +52,10 @@ const state = {
   levels: new Map(), // userId -> уровень 0..1
   localTile: null,
   localScreenTile: null, // отдельная плитка собственной демонстрации
-  monitorOn: false,      // «слышать себя» прямо в звонке
-  monitorBeforeMute: false,
+  // «Заглушить звук» (deafen): микрофон в звонок не идёт и собеседников
+  // не слышно. Включается одной кнопкой, как в Discord.
+  deafened: false,
+  mutedBeforeDeafen: false,
 };
 
 const els = {};
@@ -183,7 +190,12 @@ function outboundAudioTrack() {
 // ======================================================================
 //  Плитки участников
 // ======================================================================
-function tileAvatar(name) {
+/**
+ * Аватарка участника в плитке: картинка, если она есть, иначе инициалы.
+ * Второй аргумент — объект ``avatar`` из сигнализации/истории чата.
+ */
+function tileAvatar(name, avatar = null) {
+  if (avatar?.url) return buildAvatar({ username: name, avatar }, 'avatar avatar--lg');
   const node = el('span', { class: 'avatar avatar--lg' }, initials(name));
   Object.assign(node.style, avatarStyle(name));
   return node;
@@ -196,8 +208,11 @@ function tileAvatar(name) {
  *   отдельная плитка демонстрации экрана. Демонстрация всегда рисуется
  *   отдельной плиткой, поэтому камера и экран видны одновременно.
  */
-function createTile({ userId, username, isLocal = false, kind = 'camera' }) {
-  const tileId = kind === 'screen' ? `${userId}-screen` : String(userId);
+function createTile({ userId, username, isLocal = false, kind = 'camera', avatar = null }) {
+  // Локальная плитка «я» получает предсказуемый id: иначе в dataset.tile
+  // попадало слово local, и обращаться к ней из отладки было неудобно.
+  let tileId = kind === 'screen' ? `${userId}-screen` : String(userId);
+  if (isLocal && kind === 'camera') tileId = String(CONFIG.userId);
   const tile = el('div', {
     class: `voice-tile voice-tile--${kind}`,
     dataset: { tile: tileId, local: String(isLocal), kind },
@@ -214,7 +229,7 @@ function createTile({ userId, username, isLocal = false, kind = 'camera' }) {
   video.muted = isLocal;
   video.hidden = true;
 
-  const fallback = el('div', { class: 'voice-tile__fallback' }, tileAvatar(username));
+  const fallback = el('div', { class: 'voice-tile__fallback' }, tileAvatar(username, avatar));
 
   // «это вы» / «только звук» убраны: имя на плитке говорит само за себя,
   // а демонстрация подписана отдельно
@@ -228,6 +243,9 @@ function createTile({ userId, username, isLocal = false, kind = 'camera' }) {
   );
 
   const badges = el('div', { class: 'voice-tile__badges' });
+  // «×2» — у человека несколько устройств в канале
+  const devices = el('span', { class: 'voice-tile__devices', hidden: true });
+  badges.append(devices);
 
   tile.append(video, fallback, badges, nameRow);
 
@@ -243,7 +261,7 @@ function createTile({ userId, username, isLocal = false, kind = 'camera' }) {
     }
   });
 
-  return { tile, video, fallback, nameRow, badges, kind, tileId };
+  return { tile, video, fallback, nameRow, badges, devices, kind, tileId };
 }
 
 /** Бейдж на плитке демонстрации: только отметка «со звуком / без звука». */
@@ -261,13 +279,26 @@ function paintScreenBadge(entry, node) {
   badges.append(badge);
 }
 
+/**
+ * Очищает бейджи плитки, сохраняя счётчик устройств «×2»:
+ * он принадлежит самой плитке, а не текущему набору флагов.
+ */
+function resetBadges(tileNode) {
+  if (!tileNode?.badges) return null;
+  const deviceNode = tileNode.devices || null;
+  tileNode.badges.innerHTML = '';
+  if (deviceNode) tileNode.badges.append(deviceNode);
+  return tileNode.badges;
+}
+
 function updateTileBadges(entry) {
   if (entry.tileNode && entry.tileNode.kind === 'screen') paintScreenBadge(entry, entry.tileNode);
   if (entry.screenTile) paintScreenBadge(entry, entry.screenTile);
   if (!entry.tileNode || entry.tileNode.kind === 'screen') return;
 
-  const badges = entry.tileNode.badges;
-  badges.innerHTML = '';
+  const badges = resetBadges(entry.tileNode);
+  paintDeviceCount(entry);
+  if (!badges) return;
 
   if (entry.muted) {
     const badge = el('span', { class: 'voice-tile__badge voice-tile__badge--muted', title: t('voice.muted_badge') });
@@ -340,9 +371,13 @@ function paintTile(node, stream) {
  * демонстрация живёт в собственной плитке (см. refreshRemoteScreen).
  */
 function refreshRemoteVideo(entry) {
-  if (!entry?.tileNode) return;
-  const stream = isUsableTrack(entry.cameraTrack) ? new MediaStream([entry.cameraTrack]) : null;
-  paintTile(entry.tileNode, stream);
+  if (!entry) return;
+  // Видео рисует только устройство, которому принадлежит плитка человека
+  if (entry.rep && entry.tileNode) {
+    const stream = isUsableTrack(entry.cameraTrack) ? new MediaStream([entry.cameraTrack]) : null;
+    paintTile(entry.tileNode, stream);
+  }
+  refreshUserTile(entry.userId);
 }
 
 /**
@@ -416,8 +451,8 @@ function isPeerReady(pc) {
   return pc.signalingState !== 'closed' && pc.remoteDescription;
 }
 
-async function createPeer(userId, username, { initiator }) {
-  if (state.peers.has(userId)) return state.peers.get(userId);
+async function createPeer(userId, username, { initiator, avatar = null, sid = null }) {
+  if (sid && state.peers.has(sid)) return state.peers.get(sid);
 
   const pc = new RTCPeerConnection({
     iceServers: state.iceServers,
@@ -425,8 +460,10 @@ async function createPeer(userId, username, { initiator }) {
   });
 
   const entry = {
-    userId,
+    sid, // соединение конкретного устройства собеседника
+    userId, // человек, которому оно принадлежит
     username,
+    avatar,
     pc,
     initiator,
     micSender: null,
@@ -444,7 +481,7 @@ async function createPeer(userId, username, { initiator }) {
     tileNode: null,
     connected: false,
   };
-  state.peers.set(userId, entry);
+  state.peers.set(sid, entry);
 
   // Трансиверы создаёт только инициатор: у отвечающей стороны они появятся
   // из полученного offer'а, иначе Chrome не свяжет их с m-line'ами и
@@ -462,7 +499,7 @@ async function createPeer(userId, username, { initiator }) {
   // --- ICE ---------------------------------------------------------------
   pc.onicecandidate = (event) => {
     if (event.candidate) {
-      emit('ice_candidate', { target: userId, candidate: event.candidate, room: state.room });
+      emit('ice_candidate', { target_sid: entry.sid, candidate: event.candidate, room: state.room });
     }
   };
 
@@ -470,7 +507,7 @@ async function createPeer(userId, username, { initiator }) {
     entry.connected = pc.connectionState === 'connected';
     updateVoiceStatus();
     if (['failed', 'closed'].includes(pc.connectionState)) {
-      removePeer(userId);
+      removePeer(entry.sid);
     }
   };
 
@@ -534,9 +571,17 @@ async function createPeer(userId, username, { initiator }) {
   };
 
   // --- плитка ------------------------------------------------------------
-  entry.tileNode = createTile({ userId, username });
-  mountTile(entry);
-  updateTileBadges(entry);
+  // Идентификатор плитки — sid: у одного человека их может быть несколько
+  // Плитка создаётся только у представителя человека: несколько устройств
+  // одного аккаунта показываются одной плиткой с подписью «×2».
+  // entry уже лежит в state.peers, поэтому «свои» устройства исключаем вручную.
+  const hasHolder = devicesOfUser(userId).some((other) => other !== entry && other.rep);
+  if (!hasHolder) {
+    entry.rep = true;
+    entry.tileNode = createTile({ userId: sid || userId, username, avatar: entry.avatar });
+    mountTile(entry);
+    updateTileBadges(entry);
+  }
 
   if (initiator) {
     await negotiate(entry);
@@ -587,7 +632,7 @@ async function negotiate(entry) {
   try {
     const offer = await entry.pc.createOffer();
     await entry.pc.setLocalDescription(offer);
-    emit('offer', { target: entry.userId, sdp: entry.pc.localDescription, room: state.room });
+    emit('offer', { target_sid: entry.sid, target: entry.userId, sdp: entry.pc.localDescription, room: state.room });
   } catch (error) {
     console.warn('negotiate failed', error);
   }
@@ -595,12 +640,20 @@ async function negotiate(entry) {
 
 async function applyOffer(payload) {
   const from = Number(payload.from);
-  if (!from || from === CONFIG.userId) return;
+  const fromSid = payload.from_sid || null;
+  // Себя определяем по sid, а не по user_id: тот же аккаунт на другом
+  // устройстве — это отдельное соединение, и его offer нужно принять.
+  if (!from || !fromSid || fromSid === state.selfSid) return;
+  // Без sid нельзя различить два устройства одного человека — такая
+  // ситуация возможна только со старым сервером, вежливо игнорируем.
+  if (!fromSid) return;
 
   const username = payload.from_username || `#${from}`;
-  let entry = state.peers.get(from);
+  let entry = state.peers.get(fromSid);
   if (!entry) {
-    entry = await createPeer(from, username, { initiator: false });
+    entry = await createPeer(from, username, { initiator: false, sid: fromSid, avatar: payload.from_avatar || null });
+  } else if (payload.from_username) {
+    entry.username = payload.from_username;
   }
 
   try {
@@ -618,15 +671,14 @@ async function applyOffer(payload) {
     await flushCandidates(entry);
     const answer = await entry.pc.createAnswer();
     await entry.pc.setLocalDescription(answer);
-    emit('answer', { target: from, sdp: entry.pc.localDescription, room: state.room });
+    emit('answer', { target_sid: fromSid, target: from, sdp: entry.pc.localDescription, room: state.room });
   } catch (error) {
     console.warn('applyOffer failed', error);
   }
 }
 
 async function applyAnswer(payload) {
-  const from = Number(payload.from);
-  const entry = state.peers.get(from);
+  const entry = state.peers.get(payload.from_sid || null);
   if (!entry) return;
   try {
     await entry.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
@@ -637,8 +689,7 @@ async function applyAnswer(payload) {
 }
 
 async function applyCandidate(payload) {
-  const from = Number(payload.from);
-  const entry = state.peers.get(from);
+  const entry = state.peers.get(payload.from_sid || null);
   if (!entry || !payload.candidate) return;
   if (!isPeerReady(entry.pc)) {
     entry.pendingCandidates.push(payload.candidate);
@@ -662,8 +713,8 @@ async function flushCandidates(entry) {
   }
 }
 
-function removePeer(userId) {
-  const entry = state.peers.get(userId);
+function removePeer(key) {
+  const entry = state.peers.get(key);
   if (!entry) return;
   try {
     entry.pc.close();
@@ -673,11 +724,16 @@ function removePeer(userId) {
   entry.audioEl?.remove();
   entry.screenAudioEl?.remove();
   entry.tileNode?.tile.remove();
+  entry.tileNode = null;
   entry.screenTile?.tile.remove();
   entry.screenTile = null;
   detachRemoteAnalyser(entry);
-  state.peers.delete(userId);
-  state.levels.delete(userId);
+  state.peers.delete(key);
+  state.levels.delete(key);
+
+  // Плитка человека достаётся его следующему устройству (если оно есть),
+  // а если человек ушёл целиком — плитка уже удалена вместе с entry.
+  rebalanceTiles();
   updateGridCount();
   updateVoiceStatus();
 }
@@ -689,7 +745,7 @@ function closeAllPeers() {
 // ======================================================================
 //  Анализ уровня звука (индикатор «говорит», VU-метр)
 // ======================================================================
-const analyserRegistry = new Map(); // userId -> {analyser, data}
+const analyserRegistry = new Map(); // sid устройства -> {analyser, data}
 
 function sharedContext() {
   if (!state.meter.ctx) {
@@ -708,21 +764,21 @@ function attachRemoteAnalyser(entry, track) {
     analyser.fftSize = 256;
     analyser.smoothingTimeConstant = 0.6;
     source.connect(analyser);
-    analyserRegistry.set(entry.userId, { analyser, data: new Uint8Array(analyser.fftSize), source });
+    analyserRegistry.set(entry.sid, { analyser, data: new Uint8Array(analyser.fftSize), source });
   } catch (error) {
     console.warn('analyser for remote failed', error);
   }
 }
 
 function detachRemoteAnalyser(entry) {
-  const record = analyserRegistry.get(entry.userId);
+  const record = analyserRegistry.get(entry.sid);
   if (!record) return;
   try {
     record.source.disconnect();
   } catch {
     /* noop */
   }
-  analyserRegistry.delete(entry.userId);
+  analyserRegistry.delete(entry.sid);
 }
 
 function rms(analyser, data) {
@@ -771,10 +827,12 @@ function levelLoop() {
     bus.emit('voice:local-level', { level: value });
   }
 
-  analyserRegistry.forEach((record, userId) => {
-    const value = applyHold(userId, peakLevel(record));
-    state.levels.set(userId, value);
-    updateSpeaking(state.peers.get(userId), value, false);
+  analyserRegistry.forEach((record, sid) => {
+    const value = applyHold(sid, peakLevel(record));
+    state.levels.set(sid, value);
+    const analysis = state.peers.get(sid);
+    // Плитка у представителя человека, поэтому подсветку «говорит» рисуем на ней
+    updateSpeaking(analysis ? representativeOf(analysis.userId) : null, value, false);
   });
 
   state.rafId = requestAnimationFrame(levelLoop);
@@ -827,7 +885,7 @@ function outputVolume() {
 
 /** Громкость чужих голосов: 0, пока включён режим «слышать себя». */
 function applyPeerVolume() {
-  const volume = state.monitorOn ? 0 : outputVolume();
+  const volume = state.deafened ? 0 : outputVolume();
   state.peers.forEach((entry) => {
     if (entry.audioEl) entry.audioEl.volume = volume;
     if (entry.screenAudioEl) entry.screenAudioEl.volume = volume;
@@ -840,7 +898,7 @@ function applyPeerVolume() {
 function applyOutputVolume() {
   applyPeerVolume();
   // Громкость собственного монитора следует за ползунком вывода
-  if (state.monitorOn) applyMonitorGain(!state.muted);
+  // Монитор в звонке больше не используется: его заменила заглушка
 }
 
 async function applySinkId(element) {
@@ -1037,6 +1095,7 @@ export async function joinVoice(slug = state.room) {
   state.joined = true;
   state.connecting = false;
   state.muted = false;
+  state.selfSid = response.sid || null;
 
   els.joinBlock.hidden = true;
   els.body.hidden = false;
@@ -1045,10 +1104,17 @@ export async function joinVoice(slug = state.room) {
   if (els.pill) els.pill.hidden = false;
 
   // Локальная плитка
+  const me = currentUser();
   state.localTileEntry = {
     userId: 'local',
     username: CONFIG.username,
-    tileNode: createTile({ userId: 'local', username: CONFIG.username, isLocal: true }),
+    avatar: me?.avatar || null,
+    tileNode: createTile({
+      userId: 'local',
+      username: CONFIG.username,
+      isLocal: true,
+      avatar: me?.avatar || null,
+    }),
     muted: false,
     sharing: false,
     screenAudioOn: false,
@@ -1056,19 +1122,26 @@ export async function joinVoice(slug = state.room) {
   mountTile(state.localTileEntry);
   refreshLocalVideo();
 
-  // Инициатор — новичок: делаем offer всем, кто уже в канале
+  // Инициатор — новичок: делаем offer каждому УСТРОЙСТВУ, которое уже в канале.
+  // Свои же другие устройства в списке тоже есть — с ними тоже нужно соединение.
   const existing = response.users || [];
-  for (const user of existing) {
-    if (Number(user.user_id) === CONFIG.userId) continue;
-    await createPeer(Number(user.user_id), user.username, { initiator: true });
-    if (user.muted) setPeerMuted(user.user_id, true);
-    if (user.sharing) setPeerSharing(user.user_id, true, { hasAudio: user.screen_audio ?? null });
+  for (const device of existing) {
+    if (!device.sid) continue;
+    if (device.sid === response.sid) continue; // это мы сами
+    await createPeer(Number(device.user_id), device.username, {
+      initiator: true,
+      avatar: device.avatar,
+      sid: device.sid,
+    });
+    if (device.muted) setPeerMuted(device.sid, true);
+    if (device.sharing) setPeerSharing(device.sid, true, { hasAudio: device.screen_audio ?? null });
   }
 
-  setVoiceCount(slug, existing.length + 1, [
-    CONFIG.username,
-    ...existing.map((user) => user.username),
-  ]);
+  // Счётчик в сайдбаре считает людей, а не устройства
+  const people = new Map();
+  people.set(CONFIG.userId, CONFIG.username);
+  existing.forEach((device) => people.set(Number(device.user_id), device.username));
+  setVoiceCount(slug, people.size, [...people.values()]);
   emit('voice_media_state', { room: slug, muted: false, camera: false });
   updateControls();
   updateVoiceStatus();
@@ -1103,13 +1176,15 @@ export async function leaveVoice() {
   state.localTileEntry = null;
   state.localScreenTile?.tile.remove();
   state.localScreenTile = null;
-  state.monitorOn = false;
+  state.deafened = false;
+  state.muted = false;
 
   state.joined = false;
   state.connecting = false;
   state.muted = false;
   state.cameraOn = false;
   state.screenOn = false;
+  state.selfSid = null;
 
   els.joinBlock.hidden = false;
   els.body.hidden = false;
@@ -1137,7 +1212,7 @@ export function toggleMute() {
 
   // Во время прослушивания себя микрофон должен оставаться живым локально:
   // окружающие при этом нас не слышат (трек в звонок выключен выше).
-  if (state.monitorOn) applyMonitorGain(!state.muted);
+  // Монитор в звонке больше не используется: его заменила заглушка
 
   updateControls();
   updateSpeaking(state.localTileEntry, state.levels.get('local') || 0, state.muted);
@@ -1205,50 +1280,54 @@ export async function setScreenState(active, stream = null) {
   if (!active) {
     state.screenStream = null;
   }
+  // Сервер адресует флаг конкретному устройству, поэтому нужен собственный sid
   emit(active ? 'screen_started' : 'screen_stopped', {
     room: state.room,
+    sid: state.selfSid,
     audio: Boolean(active && audioTrack),
   });
   bus.emit('voice:screen-changed', { active });
 }
 
 /**
- * Громкость монитора внутри графа. 0 — выключено.
- * Монитор сидит на последнем узле цепочки, поэтому при RNNoise слышно
- * именно обработанный голос.
- */
-function applyMonitorGain(on) {
-  const graph = state.audioGraph;
-  if (!graph?.monitor) return;
-  graph.monitor.gain.value = on ? Math.max(0, Math.min(1, outputVolume())) : 0;
-}
-
-/**
- * «Слышать себя» прямо в звонке.
+ * «Заглушить звук» (deafen).
  *
- * Пока режим включён, микрофон не уходит в звонок: собеседники нас не слышат,
- * а мы не слышим их (их элементы воспроизведения глушатся). Так исключается
- * акустическая петля «свой микрофон ↔ свой динамик», которая иначе даёт эхо.
+ * В отличие от простого mute, заглушка делает две вещи сразу:
+ * микрофон не уходит в звонок (track.enabled = false, собеседники не слышат)
+ * и все удалённые дорожки приглушаются (мы не слышим их). Это привычное
+ * поведение кнопки «Deafen» в голосовых чатах.
+ *
+ * Состояние mute при этом запоминается: выключив заглушку, человек возвращается
+ * к тому, был ли у него выключен микрофон до неё.
  */
-export function toggleMonitor() {
+export function toggleDeafen() {
   if (!state.joined) return false;
-  state.monitorOn = !state.monitorOn;
+
+  state.deafened = !state.deafened;
+
+  if (state.deafened) {
+    // Запоминаем, был ли микрофон выключен до заглушки
+    state.mutedBeforeDeafen = state.muted;
+    state.muted = true;
+  } else {
+    state.muted = state.mutedBeforeDeafen;
+  }
 
   const track = outboundAudioTrack();
-  if (track) track.enabled = state.monitorOn ? false : !state.muted;
+  if (track) track.enabled = !state.deafened && !state.muted;
 
-  applyMonitorGain(state.monitorOn && !state.muted);
   applyPeerVolume();
-
   updateControls();
   updateTileBadges(state.localTileEntry || {});
-  emit('voice_media_state', { room: state.room, muted: state.muted || state.monitorOn, camera: state.cameraOn });
-  bus.emit('voice:monitor-changed', { active: state.monitorOn });
-  return state.monitorOn;
+
+  // Собеседникам важно знать про микрофон; заглушка для них выглядит как mute
+  emit('voice_media_state', { room: state.room, muted: state.muted, camera: state.cameraOn });
+  bus.emit('voice:deafen-changed', { active: state.deafened });
+  return state.deafened;
 }
 
-export function isMonitorOn() {
-  return state.monitorOn;
+export function isDeafened() {
+  return state.deafened;
 }
 
 export function toggleScreen() {
@@ -1266,21 +1345,173 @@ export async function switchVoiceRoom(slug) {
 // ======================================================================
 //  Состояние участников с сервера
 // ======================================================================
-function setPeerMuted(userId, muted) {
-  const entry = state.peers.get(Number(userId));
-  if (!entry) return;
-  entry.muted = muted;
-  updateTileBadges({ ...entry, muted, sharing: entry.sharing });
+/**
+ * Устройство-«представитель» человека: именно оно рисует единственную плитку.
+ * Правило простое — первое устройство по порядку добавления. Когда оно
+ * уходит, плитка переезжает на следующее, поэтому человек не «мигает».
+ * @param {number} userId
+ * @returns {object|null}
+ */
+function representativeOf(userId) {
+  const devices = devicesOfUser(userId);
+  return (
+    devices.find((entry) => entry.rep && entry.tileNode)
+    || devices.find((entry) => entry.tileNode)
+    || null
+  );
 }
 
-function setPeerSharing(userId, sharing, { hasAudio = null } = {}) {
-  const entry = state.peers.get(Number(userId));
+/** Счётчик устройств человека — им подписывается плитка («×2»). */
+function paintDeviceCount(entry, explicitCount = null) {
+  const node = entry?.tileNode?.devices;
+  if (!node) return;
+  const count = explicitCount ?? devicesOfUser(entry.userId).length;
+  node.hidden = count <= 1;
+  node.textContent = count > 1 ? `×${count}` : '';
+  node.title = count > 1 ? t('voice.other_device') : '';
+}
+
+/** Пересчитывает домики после добавления/удаления устройства. */
+function rebalanceTiles() {
+  const byUser = new Map();
+  state.peers.forEach((entry) => {
+    const id = Number(entry.userId);
+    if (!byUser.has(id)) byUser.set(id, []);
+    byUser.get(id).push(entry);
+  });
+
+  byUser.forEach((devices, userId) => {
+    const holder = devices.find((entry) => entry.rep);
+    if (holder) return;
+    const primary = devices[0];
+    primary.rep = true;
+    primary.tileNode = createTile({
+      userId: primary.sid || userId,
+      username: primary.username,
+      avatar: primary.avatar,
+    });
+    mountNode(primary.tileNode);
+    refreshRemoteVideo(primary);
+    if (primary.sharing && isUsableTrack(primary.screenVideoTrack)) refreshRemoteScreen(primary);
+  });
+
+  state.peers.forEach((entry) => paintDeviceCount(representativeOf(entry.userId)));
+}
+
+/**
+ * Устройства одного человека в комнате.
+ * @param {number} userId
+ * @returns {object[]}
+ */
+function devicesOfUser(userId) {
+  const id = Number(userId);
+  return [...state.peers.values()].filter((entry) => Number(entry.userId) === id);
+}
+
+/**
+ * Сводные флаги человека: «выключен микрофон» = выключен на всех его
+ * устройствах, «демонстрирует экран» = хотя бы на одном.
+ */
+function userFlags(userId) {
+  const devices = devicesOfUser(userId);
+  if (!devices.length) return { muted: false, sharing: false, screenAudioOn: false };
+  return {
+    muted: devices.every((entry) => entry.muted),
+    sharing: devices.some((entry) => entry.sharing),
+    screenAudioOn: devices.some((entry) => entry.sharing && entry.screenAudioOn),
+  };
+}
+
+/**
+ * Перерисовывает плитку-представление человека: у него может быть
+ * несколько устройств, а в интерфейсе он должен остаться одной плиткой.
+ */
+function refreshUserTile(userId) {
+  const id = Number(userId);
+  const devices = devicesOfUser(id);
+  if (!devices.length) return;
+  const primary = devices.find((entry) => entry.rep) || devices[0];
+  const { muted, sharing } = userFlags(id);
+  paintDeviceCount(primary);
+  const badges = resetBadges(primary.tileNode);
+  if (!badges) return;
+
+  if (sharing) {
+    const badge = el('span', { class: 'voice-tile__badge voice-tile__badge--sharing', title: t('voice.screen_running') });
+    badge.append(icon('screen'));
+    badges.append(badge);
+  }
+  if (muted) {
+    const badge = el('span', { class: 'voice-tile__badge voice-tile__badge--muted', title: t('voice.muted_badge') });
+    badge.append(icon('mic-off'));
+    badges.append(badge);
+  }
+  // Камера: показываем ту, что реально идёт с любого его устройства
+  const withCamera = devices.find((entry) => isUsableTrack(entry.cameraTrack));
+  if (primary.tileNode) {
+    if (withCamera) paintTile(primary.tileNode, new MediaStream([withCamera.cameraTrack]));
+    else if (!primary.cameraTrack) paintTile(primary.tileNode, null);
+  }
+}
+
+function setPeerMuted(sid, muted) {
+  const entry = state.peers.get(sid);
+  if (!entry) return;
+  entry.muted = muted;
+  refreshUserTile(entry.userId);
+}
+
+function setPeerSharing(sid, sharing, { hasAudio = null } = {}) {
+  const entry = state.peers.get(sid);
   if (!entry) return;
   entry.sharing = sharing;
   if (hasAudio !== null) entry.screenAudioOn = Boolean(hasAudio);
   if (!sharing) entry.screenAudioOn = false;
-  updateTileBadges(entry);
+  refreshUserTile(entry.userId);
   refreshRemoteScreen(entry);
+}
+
+/** Текущий состав по данным клиента (для точечных перерисовок). */
+function currentRoster() {
+  const me = currentUser();
+  const local = {
+    user_id: CONFIG.userId,
+    username: CONFIG.username,
+    muted: state.muted,
+    sharing: state.screenOn,
+    avatar: me?.avatar || null,
+  };
+  const remote = [...state.peers.values()].map((entry) => ({
+    user_id: entry.userId,
+    username: entry.username,
+    muted: entry.muted,
+    sharing: entry.sharing,
+    avatar: entry.avatar,
+  }));
+  return [local, ...remote];
+}
+
+/** Устройства состояния, сгруппированные по людям (для списка участников). */
+function groupedRoster(devices) {
+  const byUser = new Map();
+  devices.forEach((device) => {
+    const id = Number(device.user_id);
+    const known = byUser.get(id);
+    if (!known) {
+      byUser.set(id, { ...device, devices: 1 });
+      return;
+    }
+    // Флаги объединяем: «говорит кто-то из его устройств» = «говорит»
+    byUser.set(id, {
+      ...known,
+      muted: known.muted && device.muted,
+      sharing: known.sharing || device.sharing,
+      camera: known.camera || device.camera,
+      avatar: known.avatar || device.avatar,
+      devices: known.devices + 1,
+    });
+  });
+  return [...byUser.values()];
 }
 
 function renderVoiceRoster(users) {
@@ -1295,13 +1526,26 @@ function renderVoiceRoster(users) {
   }
 
   els.count.hidden = false;
-  els.count.textContent = String(users.length);
+  // Один человек с двух устройств — одна строка в списке участников
+  const byUser = groupedRoster(users);
+  els.count.textContent = String(byUser.length);
 
-  users.forEach((user) => {
+  byUser.forEach((user) => {
     const row = el('div', { class: 'voice-list__row' });
-    const avatar = el('span', { class: 'avatar avatar--sm' }, initials(user.username));
-    Object.assign(avatar.style, avatarStyle(user.username));
+    const avatar = user.avatar?.url
+      ? buildAvatar({ username: user.username, avatar: user.avatar }, 'avatar avatar--sm')
+      : (() => {
+          const node = el('span', { class: 'avatar avatar--sm' }, initials(user.username));
+          Object.assign(node.style, avatarStyle(user.username));
+          return node;
+        })();
     row.append(avatar, el('span', { class: 'voice-list__name' }, user.username));
+    // Второе устройство того же человека — отдельная маленькая метка
+    if (user.devices > 1) {
+      const deviceBadge = el('span', { class: 'badge badge--device', title: t('voice.other_device') });
+      deviceBadge.append(icon('devices'), el('span', {}, `×${user.devices}`));
+      row.append(deviceBadge);
+    }
 
     if (user.sharing) {
       const badge = el('span', { class: 'badge badge--accent' });
@@ -1329,13 +1573,15 @@ function updateControls() {
   muteBtn.querySelector('use').setAttribute('href', state.muted ? '#i-mic-off' : '#i-mic');
   muteBtn.classList.toggle('ctrl-btn--danger', state.muted);
 
-  const monitorBtn = els.monitor;
-  if (monitorBtn) {
-    monitorBtn.setAttribute('aria-pressed', String(state.monitorOn));
-    const key = state.monitorOn ? 'voice.monitor_off' : 'voice.monitor_on';
-    monitorBtn.setAttribute('aria-label', t(key));
-    monitorBtn.setAttribute('title', t(key));
-    monitorBtn.classList.toggle('ctrl-btn--active', state.monitorOn);
+  const deafenBtn = els.deafen;
+  if (deafenBtn) {
+    deafenBtn.setAttribute('aria-pressed', String(state.deafened));
+    const key = state.deafened ? 'voice.undeafen' : 'voice.deafen';
+    deafenBtn.setAttribute('aria-label', t(key));
+    deafenBtn.setAttribute('title', t(key));
+    deafenBtn.classList.toggle('ctrl-btn--danger', state.deafened);
+    const use = deafenBtn.querySelector('use');
+    if (use) use.setAttribute('href', state.deafened ? '#i-volume-off' : '#i-ear-off');
   }
 
   const camBtn = els.camera;
@@ -1369,7 +1615,7 @@ function updateVoiceStatus() {
 
   if (state.joined && state.peers.size) {
     const connected = [...state.peers.values()].filter((entry) => entry.connected).length;
-    if (connected === 0 && !state.peers.size) {
+    if (connected === 0 && state.peers.size > 0) {
       text.textContent = t('voice.reconnecting');
       node.dataset.state = 'connecting';
       return;
@@ -1404,7 +1650,7 @@ function initUI() {
   els.count = $('#voice-count');
   els.secureWarning = $('#voice-secure-warning');
   els.closeBtn = $('#close-voice-panel');
-  els.monitor = $('#btn-monitor');
+  els.deafen = $('#btn-deafen');
 
   if (!els.panel) return;
 
@@ -1418,7 +1664,7 @@ function initUI() {
   });
 
   els.mute.addEventListener('click', () => toggleMute());
-  els.monitor?.addEventListener('click', () => toggleMonitor());
+  els.deafen?.addEventListener('click', () => toggleDeafen());
   els.camera.addEventListener('click', () => toggleCamera());
   els.screen.addEventListener('click', () => toggleScreen());
   els.leave.addEventListener('click', () => leaveVoice());
@@ -1446,43 +1692,95 @@ function initSocketHandlers() {
 
   on('voice_user_joined', async (payload) => {
     if (!state.joined || payload.room !== state.room) return;
-    if (Number(payload.user_id) === CONFIG.userId) return;
-    // Новичок сам пришлёт offer — соединение создастся по нему.
-    renderVoiceRoster([...state.peers.values()].map((entry) => ({
+    if (!payload.sid) return;
+
+    // Новичок сам пришлёт offer — соединение создастся по нему. Здесь только
+    // обновляем список участников (по устройствам, «×2» считается ниже).
+    const devices = [...state.peers.values()].map((entry) => ({
       user_id: entry.userId,
       username: entry.username,
+      sid: entry.sid,
       muted: entry.muted,
       sharing: entry.sharing,
-    })).concat([{ user_id: payload.user_id, username: payload.username, muted: false, sharing: false }]));
+      avatar: entry.avatar,
+    }));
+    if (!devices.some((item) => item.sid === payload.sid)) {
+      devices.push({
+        user_id: payload.user_id,
+        username: payload.username,
+        sid: payload.sid,
+        muted: false,
+        sharing: false,
+        avatar: payload.avatar,
+      });
+    }
+    renderVoiceRoster(devices);
+
+    // Счётчик «×N» рисуется на плите человека. Для ещё не подключённого
+    // устройства пира в state.peers нет, поэтому считаем по списку devices.
+    const userId = Number(payload.user_id);
+    const peer = representativeOf(userId);
+    if (peer?.tileNode) {
+      const count = devices.filter((item) => Number(item.user_id) === userId).length;
+      paintDeviceCount(peer, count);
+    }
+  });
+
+  on('avatar_changed', (payload) => {
+    if (!state.joined || payload.room !== state.room) return;
+    const userId = Number(payload.user_id);
+    if (userId === CONFIG.userId) return;
+
+    devicesOfUser(userId).forEach((entry) => {
+      entry.avatar = payload.avatar;
+      // Перерисовываем аватарку в центральной части плитки
+      const fallback = entry.tileNode?.querySelector('.voice-tile__fallback');
+      if (fallback) {
+        fallback.innerHTML = '';
+        fallback.append(tileAvatar(entry.username, entry.avatar));
+      }
+    });
+    renderVoiceRoster(currentRoster());
   });
 
   on('voice_user_left', (payload) => {
     if (!state.joined || payload.room !== state.room) return;
-    removePeer(Number(payload.user_id));
+    // Ушёл последний человек — снимаем все его соединения
+    devicesOfUser(payload.user_id).forEach((entry) => removePeer(entry.sid));
+  });
+
+  on('voice_device_left', (payload) => {
+    if (!state.joined || payload.room !== state.room) return;
+    if (!payload.sid) return;
+    // Ушло одно устройство человека, остальные остаются в канале
+    removePeer(payload.sid);
   });
 
   on('voice_roster', (payload) => {
     if (!payload?.users) return;
     if (payload.room === state.room && state.joined) renderVoiceRoster(payload.users);
-    // Имена нужны для подсказки у счётчика в сайдбаре
-    setVoiceCount(payload.room, payload.users.length, payload.users.map((user) => user.username));
+    // Счётчик и подсказка в сайдбаре считают людей, а не устройства
+    const people = groupedRoster(payload.users);
+    setVoiceCount(payload.room, people.length, people.map((user) => user.username));
   });
 
   on('voice_media_state', (payload) => {
     if (payload.room !== state.room) return;
-    if (Number(payload.user_id) === CONFIG.userId) return;
-    setPeerMuted(payload.user_id, Boolean(payload.muted));
-    const entry = state.peers.get(Number(payload.user_id));
-    if (entry) {
-      entry.camera = Boolean(payload.camera);
-      refreshRemoteVideo(entry);
-    }
+    if (!payload.sid) return; // старый сервер без sid — игнорируем
+    const entry = state.peers.get(payload.sid);
+    if (!entry) return;
+    setPeerMuted(payload.sid, Boolean(payload.muted));
+    entry.camera = Boolean(payload.camera);
+    refreshRemoteVideo(entry);
+    refreshUserTile(entry.userId);
   });
 
   on('screen_state', (payload) => {
     if (payload.room !== state.room) return;
-    if (Number(payload.user_id) === CONFIG.userId) return;
-    setPeerSharing(payload.user_id, Boolean(payload.sharing), {
+    if (!payload.sid) return;
+    const entry = state.peers.get(payload.sid);
+    if (!entry) return;
+    setPeerSharing(payload.sid, Boolean(payload.sharing), {
       hasAudio: payload.audio ?? null,
     });
   });
@@ -1565,7 +1863,7 @@ function exposeDebugApi() {
         muted: state.muted,
         cameraOn: state.cameraOn,
         screenOn: state.screenOn,
-        monitorOn: state.monitorOn,
+        deafened: state.deafened,
         layout: getMode(),
         spotlight: getSpotlight(),
         tiles: [...els.grid.querySelectorAll('.voice-tile')].map((tile) => ({
@@ -1578,6 +1876,7 @@ function exposeDebugApi() {
         transceivers: [...state.peers.values()].flatMap((entry) =>
           entry.pc.getTransceivers().map((t, index) => ({
             peer: entry.userId,
+            sid: entry.sid,
             index,
             mid: t.mid,
             direction: t.direction,
@@ -1589,6 +1888,7 @@ function exposeDebugApi() {
           })),
         ),
         peers: [...state.peers.values()].map((entry) => ({
+          sid: entry.sid,
           userId: entry.userId,
           username: entry.username,
           connection: entry.pc.connectionState,
@@ -1608,8 +1908,8 @@ function exposeDebugApi() {
         },
         analysers: {
           ctxState: state.meter.ctx?.state || null,
-          remote: [...analyserRegistry.entries()].map(([userId, rec]) => ({
-            userId,
+          remote: [...analyserRegistry.entries()].map(([sid, rec]) => ({
+            sid,
             ctxState: rec.analyser.context?.state || null,
             sample: (() => {
               const buf = new Uint8Array(rec.analyser.fftSize);
@@ -1624,14 +1924,16 @@ function exposeDebugApi() {
           })),
         },
         // SDP для отладки (LAN-инструмент, ничего секретного внутри нет)
-        screenAudio: [...state.peers.entries()].map(([userId, entry]) => ({
-          peer: userId,
+        screenAudio: [...state.peers.entries()].map(([sid, entry]) => ({
+          peer: entry.userId,
+          sid,
           hasScreenAudioTrack: Boolean(entry.screenAudioTrack),
           flag: Boolean(entry.screenAudioOn),
           hasElement: Boolean(entry.screenAudioEl),
         })),
         sdp: [...state.peers.values()].map((entry) => ({
           peer: entry.userId,
+          sid: entry.sid,
           initiator: entry.initiator,
           local: entry.pc.localDescription?.sdp || null,
           remote: entry.pc.remoteDescription?.sdp || null,

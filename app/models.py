@@ -167,6 +167,9 @@ class Message(db.Model):
     def to_public(self, reply_previews: dict[int, dict] | None = None) -> dict:
         """Формат, который уходит на клиент в ``text_message``.
 
+        Включает аватарку автора: иначе в чужой ленте картинка не появится —
+        клиент не обязан знать всех пользователей заранее.
+
         ``reply_previews`` — заранее собранные цитаты (см. ``_reply_previews``
         в api.py): так история не делает N+1 запрос к базе.
         """
@@ -176,6 +179,7 @@ class Message(db.Model):
             "room": self.room.slug,
             "user_id": self.user_id,
             "username": self.author.username if self.author else "?",
+            "avatar": self.author.avatar_public() if self.author else None,
             "text": self.text,
             "ts": self.created_at.isoformat(timespec="seconds") + "Z",
             "reply_to": preview,

@@ -77,17 +77,39 @@ def start_server() -> tuple[subprocess.Popen, Path]:
     raise RuntimeError("сервер не поднялся")
 
 
-def register(context, username: str):
+def register(context, username: str, password: str = "secret123"):
+    """Регистрация через онбординг: язык → аккаунт (регистрация) → тема."""
     page = context.new_page()
     page.goto(f"{BASE}/onboarding", wait_until="networkidle")
     page.click('[data-action="next"][data-from="lang"]')
-    page.wait_for_timeout(150)
-    page.click('[data-action="next"][data-from="theme"]')
+    page.wait_for_timeout(200)
+    page.click('[data-account-mode="register"]')
     page.wait_for_timeout(150)
     page.fill("#ob-username", username)
-    page.fill("#ob-password", "secret123")
-    page.fill("#ob-password2", "secret123")
+    page.fill("#ob-password", password)
+    page.fill("#ob-password2", password)
     page.click("#ob-submit")
+    # После регистрации открывается шаг темы, дальше — вход в приложение
+    page.wait_for_timeout(1200)
+    page.click('[data-action="finish"]')
+    page.wait_for_url(f"{BASE}/app", timeout=15000)
+    page.wait_for_function("document.body.dataset.ready === 'true'", timeout=15000)
+    page.click('[data-room="channel-1"]')
+    page.wait_for_timeout(400)
+    return page
+
+
+def login(context, username: str, password: str = "secret123"):
+    """Вход существующим аккаунтом — сценарий «другое устройство»."""
+    page = context.new_page()
+    page.goto(f"{BASE}/onboarding", wait_until="networkidle")
+    page.click('[data-action="next"][data-from="lang"]')
+    page.wait_for_timeout(200)
+    page.fill("#ob-username", username)
+    page.fill("#ob-password", password)
+    page.click("#ob-submit")
+    page.wait_for_timeout(1200)
+    page.click('[data-action="finish"]')
     page.wait_for_url(f"{BASE}/app", timeout=15000)
     page.wait_for_function("document.body.dataset.ready === 'true'", timeout=15000)
     page.click('[data-room="channel-1"]')
@@ -146,7 +168,9 @@ def main() -> int:
                 check(
                     "видео-элемент привязан",
                     alice.evaluate(
-                        "!!document.querySelector('.voice-tile[data-tile=\"2\"] video')?.srcObject"
+                        # плитка собеседника — единственная удалённая плитка камеры
+                        "!!document.querySelector('.voice-tile[data-local=\"false\"]"
+                        "[data-kind=\"camera\"] video')?.srcObject"
                     ),
                 )
 
@@ -157,7 +181,8 @@ def main() -> int:
                 check(
                     "бейдж микрофона на плитке",
                     bob.evaluate(
-                        "!!document.querySelector('.voice-tile[data-tile=\"1\"] .voice-tile__badge--muted')"
+                        "!!document.querySelector('.voice-tile[data-local=\"false\"]"
+                        "[data-kind=\"camera\"] .voice-tile__badge--muted')"
                     ),
                 )
                 alice.click("#btn-mute")
@@ -176,7 +201,7 @@ def main() -> int:
                         """() => {
                             const tiles = [...document.querySelectorAll('.voice-tile')];
                             const screen = tiles.filter((t) => t.dataset.kind === 'screen');
-                            const camera = tiles.filter((t) => t.dataset.tile === '2');
+                            const camera = tiles.filter((t) => t.dataset.local === 'false' && t.dataset.kind === 'camera');
                             return screen.length === 1 && camera.length === 1
                                 && !screen[0].querySelector('video').hidden
                                 && !camera[0].querySelector('video').hidden;
@@ -186,7 +211,8 @@ def main() -> int:
                 check(
                     "бейдж «Демонстрация экрана» на плитке экрана",
                     alice.evaluate(
-                        "!!document.querySelector('.voice-tile[data-tile=\"2-screen\"] .voice-tile__badge--sharing')"
+                        "!!document.querySelector('.voice-tile[data-kind=\"screen\"]"
+                        " .voice-tile__badge--sharing')"
                     ),
                 )
 
@@ -250,21 +276,35 @@ def main() -> int:
 
                 alice.click('.voice-tile[data-kind="screen"]')
                 alice.wait_for_timeout(400)
-                check("клик по плитке делает её главной", snapshot(alice)["spotlight"] == "2-screen")
+                check(
+                    "клик по плитке делает её главной",
+                    (snapshot(alice)["spotlight"] or "").endswith("-screen"),
+                    str(snapshot(alice)["spotlight"]),
+                )
 
                 alice.keyboard.press("Escape")
                 alice.wait_for_timeout(300)
                 check("Esc сворачивает из полного экрана", snapshot(alice)["layout"] == "pinned")
 
-                # --- «слышать себя»: собеседники не слышат, мы не слышим их ---
-                print("\n[6] прослушивание себя в звонке")
-                alice.click("#btn-monitor")
-                alice.wait_for_timeout(600)
-                check("монитор включился", snapshot(alice)["monitorOn"])
+                # --- заглушка: собеседники не слышат, мы не слышим их ---
+                print("\n[6] заглушка в звонке")
+                muted_before = snapshot(alice)["muted"]
+                alice.click("#btn-deafen")
+                alice.wait_for_timeout(700)
+                check("заглушка включилась", snapshot(alice)["deafened"])
+                check("микрофон выключен вместе с заглушкой", snapshot(alice)["muted"])
                 check("Bob видит Alice как выключенную", snapshot(bob)["peers"][0]["muted"])
-                alice.click("#btn-monitor")
-                alice.wait_for_timeout(600)
-                check("монитор выключился", not snapshot(alice)["monitorOn"])
+                check(
+                    "входящий звук у Alice приглушён",
+                    alice.evaluate(
+                        "() => [...document.querySelectorAll('audio.voice-tile__audio')]"
+                        ".every((a) => a.volume === 0)"
+                    ),
+                )
+                alice.click("#btn-deafen")
+                alice.wait_for_timeout(700)
+                check("заглушка выключилась", not snapshot(alice)["deafened"])
+                check("микрофон вернулся в прежнее состояние", snapshot(alice)["muted"] == muted_before)
 
                 # --- возврат к текстовому чату ---
                 alice.click('[data-room="channel-2"]')
@@ -284,11 +324,83 @@ def main() -> int:
                 bob.wait_for_timeout(1800)
                 check("флаг sharing снят", not snapshot(alice)["peers"][0]["sharing"])
 
-                print("\n[8] выход")
+                print("\n[8] мультидевайс: тот же аккаунт со второго устройства")
+                second = login(
+                    browser.new_context(viewport={"width": 1280, "height": 800},
+                                        permissions=["microphone", "camera"]),
+                    "bob_e2e",
+                )
+                second.click("#voice-join")
+                second.wait_for_timeout(3500)
+
+                sb = snapshot(bob)
+                ss = snapshot(second)
+                sa = snapshot(alice)
+                check("второе устройство в канале", ss["joined"])
+                check(
+                    "Alice соединилась с обоими устройствами Bob",
+                    len(sa["peers"]) == 2 and all(p["ice"] == "connected" for p in sa["peers"]),
+                    str([p["ice"] for p in sa["peers"]]),
+                )
+                # Полносвязная сетка: каждое устройство держит соединение и с
+                # Alice, и с другим устройством своего же человека
+                check(
+                    "у каждого устройства Bob по два соединения (Alice + второе устройство)",
+                    len(sb["peers"]) == 2 and len(ss["peers"]) == 2,
+                    f"bob={len(sb['peers'])}, second={len(ss['peers'])}",
+                )
+                check(
+                    "звук от Alice доходит до второго устройства",
+                    ss["peers"][0]["inboundAudio"] == "live",
+                )
+                check(
+                    "звук идёт в обе стороны",
+                    sb["peers"][0]["inboundAudio"] == "live" and ss["peers"][0]["inboundAudio"] == "live",
+                )
+                check(
+                    "для Alice человек с двух устройств — одна плитка и «×2»",
+                    alice.evaluate(
+                        """() => {
+                            const tiles = [...document.querySelectorAll('.voice-tile[data-kind="camera"]')];
+                            const remote = tiles.filter((t) => t.dataset.local === 'false');
+                            const counter = remote[0]?.querySelector('.voice-tile__devices');
+                            return remote.length === 1 && counter && !counter.hidden
+                                && counter.textContent.trim() === '×2';
+                        }"""
+                    ),
+                )
+                check(
+                    "участников в списке — один человек",
+                    alice.text_content("#voice-count").strip() == "2",  # Alice + Bob
+                )
+
+                second.click("#btn-leave")
+                second.wait_for_timeout(1800)
+                check(
+                    "после ухода одного устройства второе осталось в канале",
+                    len(snapshot(bob)["peers"]) == 1 and snapshot(bob)["joined"],
+                )
+                check(
+                    "у Alice осталась одна плитка Bob без «×2»",
+                    alice.evaluate(
+                        """() => {
+                            const remote = [...document.querySelectorAll(
+                                '.voice-tile[data-local="false"][data-kind="camera"]'
+                            )];
+                            const counter = remote[0]?.querySelector('.voice-tile__devices');
+                            return remote.length === 1 && counter && counter.hidden;
+                        }"""
+                    ),
+                )
+                second.context.close()
+
+                print("\n[9] выход")
                 alice.click("#btn-leave")
                 alice.wait_for_timeout(1500)
                 check("Alice вышла", not snapshot(alice)["joined"])
                 check("у Bob не осталось пиров", len(snapshot(bob)["peers"]) == 0)
+
+                # --- мультидевайс: тот же аккаунт со второго устройства ---
             finally:
                 browser.close()
     finally:

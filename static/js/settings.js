@@ -180,7 +180,8 @@ function renderThemeSection() {
 
 function renderAbout() {
   if (els.username) els.username.textContent = CONFIG.username || '—';
-  if (els.avatar) els.avatar.textContent = (CONFIG.username || '?').slice(0, 2).toUpperCase();
+  // Аватарку рисует main.js (картинка или инициалы) — здесь только имя.
+  // Иначе при смене аватарки в модалке настройки показывали бы старые буквы.
   if (els.server) els.server.textContent = location.host;
   if (els.connection) {
     els.connection.textContent = navigator.onLine ? 'online' : 'offline';
@@ -540,6 +541,11 @@ export async function initSettings({ open = false } = {}) {
 
   loadSettings();
   bindControls();
+
+  // Аватарка поменялась — настройки открыты, значит стоит обновить и её
+  bus.on('avatar:changed', () => {
+    if (els.avatar) els.avatar.setAttribute('data-stale', '1');
+  });
   syncControls();
   refreshDevices();
 

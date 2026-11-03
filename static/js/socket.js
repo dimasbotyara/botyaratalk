@@ -106,6 +106,8 @@ export function connect() {
     'answer',
     'ice_candidate',
     'screen_state',
+    'voice_device_left',
+    'avatar_changed',
   ];
   forwarded.forEach((event) => {
     socket.on(event, (payload) => bus.emit(`sio:${event}`, payload || {}));

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Точка входа botyaratalk.
 
-Запускает Flask-SocketIO на 0.0.0.0:5000. По умолчанию используется gevent
+Запускает Flask-SocketIO на 0.0.0.0:14098. По умолчанию используется gevent
 (флаг BOTYARATALK_ASYNC_MODE=threading переключает на стандартные потоки —
 это нужно тестам и отладке).
 
@@ -27,13 +27,14 @@ if ASYNC_MODE == "gevent":
 
 from app import create_app, socketio  # noqa: E402  (после monkey.patch_all)
 from app.tls import build_ssl_context, https_urls  # noqa: E402
+from config import DEFAULT_PORT  # noqa: E402
 
 app = create_app()
 
 
 if __name__ == "__main__":
     host = os.environ.get("BOTYARATALK_HOST", "0.0.0.0")
-    port = int(os.environ.get("BOTYARATALK_PORT", "5000"))
+    port = int(os.environ.get("BOTYARATALK_PORT", str(DEFAULT_PORT)))
     debug = os.environ.get("BOTYARATALK_DEBUG", "0") == "1"
 
     ssl_context = build_ssl_context()

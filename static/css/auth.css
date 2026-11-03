@@ -178,3 +178,86 @@
     display: none;
   }
 }
+
+/* --- Поле пароля с «показать» и индикатором сложности ----------------- */
+/* Классы используются и на экране входа, и в мастере онбординга, поэтому
+   живут здесь — auth.css подключается на обеих страницах. */
+
+.password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-field .input {
+  width: 100%;
+  padding-right: 44px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-subtle);
+  cursor: pointer;
+  transition: color var(--t-fast), background var(--t-fast);
+}
+
+.password-toggle:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
+
+.password-toggle[aria-pressed="true"] {
+  color: var(--accent);
+}
+
+.password-strength {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: 6px;
+}
+
+.password-strength[hidden] {
+  display: none;
+}
+
+.password-strength__bars {
+  display: flex;
+  gap: 4px;
+  flex: 1 1 auto;
+}
+
+.password-strength__bars span {
+  height: 4px;
+  flex: 1 1 0;
+  border-radius: 2px;
+  background: var(--border);
+  transition: background var(--t-fast);
+}
+
+.password-strength__label {
+  flex: 0 0 auto;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+
+.password-strength[data-score="1"] .password-strength__bars span:nth-child(-n + 1) { background: var(--danger); }
+.password-strength[data-score="2"] .password-strength__bars span:nth-child(-n + 2) { background: var(--warning); }
+.password-strength[data-score="3"] .password-strength__bars span:nth-child(-n + 3) { background: var(--accent); }
+.password-strength[data-score="4"] .password-strength__bars span { background: var(--success); }
+
+.password-strength[data-score="1"] .password-strength__label { color: var(--danger); }
+.password-strength[data-score="2"] .password-strength__label { color: var(--warning); }
+.password-strength[data-score="3"] .password-strength__label { color: var(--accent); }
+.password-strength[data-score="4"] .password-strength__label { color: var(--success); }

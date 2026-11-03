@@ -4,7 +4,7 @@
  * i18n/тема → сокет → комнаты → чат → голос → шаринг → настройки.
  */
 
-import { $, CONFIG, bus, fetchJSON, initials, setCookie, toast } from './utils.js';
+import { $, CONFIG, bus, fetchJSON, setCookie, toast } from './utils.js';
 import { initI18n, t } from './i18n.js';
 import { applyTheme, currentTheme } from './theme.js';
 import { connect, emit, isConnected } from './socket.js';
@@ -15,42 +15,27 @@ import { initStage } from './stage.js';
 import { initScreen } from './screen.js';
 import { initSettings, openSettings } from './settings.js';
 import { initAvatarEditor } from './avatar.js';
-import { buildAvatar } from './message.js';
+import { loadCurrentUser, refreshUserUi, setCurrentUser } from './user.js';
 import * as notifications from './notifications.js';
 
 const state = { ready: false };
 
 // --------------------------------------------------------------- аккаунт
 async function loadMe() {
-  const result = await fetchJSON(CONFIG.urls.me);
-  if (!result.ok || !result.user) {
+  const user = await loadCurrentUser();
+  if (!user) {
     window.location.assign(CONFIG.urls.auth);
     return null;
   }
-  return result.user;
+  return user;
 }
 
 function renderUser(user) {
-  const name = $('#sidebar-username');
-  if (name) name.textContent = user.username;
-
-  // Аватарка: картинка, если загружена/сгенерирована, иначе инициалы
-  const avatar = $('#sidebar-avatar');
-  if (avatar) {
-    const fresh = buildAvatar(user, 'avatar');
-    fresh.id = 'sidebar-avatar';
-    if (user.avatar?.url) fresh.setAttribute('aria-hidden', 'true');
-    else fresh.textContent = initials(user.username);
-    avatar.replaceWith(fresh);
-  }
-
-  const settingsAvatar = $('#settings-avatar');
-  if (settingsAvatar) {
-    const fresh = buildAvatar(user, 'avatar avatar--lg');
-    fresh.id = 'settings-avatar';
-    settingsAvatar.replaceWith(fresh);
-  }
-  document.title = 'botyaratalk';
+  // Все аватарки (сайдбар, настройки, плитка в звонке) рисует user.js —
+  // одна точка правды вместо копий по модулям.
+  if (user) setCurrentUser(user);
+  refreshUserUi({ broadcast: false });
+  document.title = user?.username || 'botyaratalk';
 }
 
 async function logout() {
@@ -179,10 +164,14 @@ async function init() {
   bindGlobalUI();
   bindNotifications();
 
-  bus.on('avatar:changed', () => {
-    loadMe().then((fresh) => {
-      if (fresh) renderUser(fresh);
-    });
+  // Аватарка поменялась: перечитываем пользователя и обновляем все точки
+  bus.on('avatar:changed', async () => {
+    const fresh = await loadCurrentUser();
+    if (!fresh) return;
+    refreshUserUi();
+    renderUser(fresh);
+    // Собеседникам в звонке сообщаем новую картинку без переподключения
+    if (isInVoice()) emit('avatar_changed', { room: getCurrentRoom()?.slug, avatar: fresh.avatar });
   });
   bindSocketLifecycle();
 

@@ -87,7 +87,7 @@ def register(socketio) -> None:
         sid = request.sid
 
         # 1) убираем из всех голосовых комнат
-        for slug, user_id in registry.leave_all(sid):
+        for slug, user_id, whole_user_left in registry.leave_all(sid):
             socketio.emit(
                 "voice_user_left",
                 _ok(user_id=user_id, room=slug),
@@ -282,36 +282,45 @@ def register(socketio) -> None:
         if not _room_by_slug(slug):
             return _err("room_not_found")
 
-        # Каналы, где пользователь висел раньше: join() вычищает его оттуда
-        # атомарно, но разослать уведомления нужно отдельно.
-        previous = sorted(
-            {room for room in registry.rooms_of_sid(request.sid) if room != slug}
-            | {room for room in registry.rooms_of_user(user["id"]) if room != slug}
+        # Каналы, где висели ДРУГИЕ устройства этого пользователя: join()
+        # вычищает пользователя из них целиком (один человек — один канал),
+        # а уведомления нужно разослать отдельно.
+        other_devices = sorted(
+            {room for room in registry.rooms_of_user(user["id"]) if room != slug}
         )
 
+        avatar = _avatar_of(user["id"])
         try:
-            participants_before, is_new = registry.join(
-                slug, user["id"], user["username"], request.sid, now=time.time()
+            devices_before, is_new = registry.join(
+                slug,
+                user["id"],
+                user["username"],
+                request.sid,
+                now=time.time(),
+                avatar=avatar,
             )
         except RoomFull:
             return _err("voice_full")
 
-        # Явно выходим из socket-комнат прошлых каналов и сообщаем об уходе,
-        # иначе у собеседников в старом канале навсегда остаётся «призрак».
-        for other in previous:
+        for other in other_devices:
             sio_leave(_voice_room(other))
             _announce_voice_left(other, user)
 
         sio_join(_voice_room(slug))
 
-        # Новому участнику — снимок комнаты (список тех, кому он сделает offer).
+        # Новому устройству — снимок комнаты (список тех, кому он сделает offer).
         emit("room_state", _ok(room=slug, users=registry.participants(slug)))
 
         if is_new:
-            # Остальным — уведомление о новичке + актуальный ростер.
             socketio.emit(
                 "voice_user_joined",
-                _ok(room=slug, user_id=user["id"], username=user["username"]),
+                _ok(
+                    room=slug,
+                    user_id=user["id"],
+                    username=user["username"],
+                    sid=request.sid,
+                    avatar=avatar,
+                ),
                 to=_voice_room(slug),
                 skip_sid=request.sid,
             )
@@ -320,7 +329,7 @@ def register(socketio) -> None:
                 _ok(room=slug, users=registry.participants(slug)),
                 to=_voice_room(slug),
             )
-        return _ok(room=slug, users=participants_before, self_id=user["id"])
+        return _ok(room=slug, users=devices_before, self_id=user["id"], sid=request.sid)
 
     @socketio.on("voice_leave")
     def on_voice_leave(data):
@@ -328,10 +337,55 @@ def register(socketio) -> None:
         if not user:
             return _err("unauthorized")
         slug = str((data or {}).get("room", ""))
-        if registry.leave(slug, user["id"]):
-            _announce_voice_left(slug, user)
+
+        result = registry.leave_device(slug, request.sid)
+        if result:
+            _, whole_user_left = result
+            if whole_user_left:
+                # Последнее устройство человека — для собеседников он ушёл
+                _announce_voice_left(slug, user)
+            else:
+                # Осталось другое устройство: собеседникам нужно убрать только
+                # это соединение, а сам человек остаётся в канале
+                socketio.emit(
+                    "voice_device_left",
+                    _ok(room=slug, user_id=user["id"], sid=request.sid),
+                    to=_voice_room(slug),
+                    skip_sid=request.sid,
+                )
+                socketio.emit(
+                    "voice_roster",
+                    _ok(room=slug, users=registry.participants(slug)),
+                    to=_voice_room(slug),
+                )
         sio_leave(_voice_room(slug))
         return _ok(room=slug)
+
+    @socketio.on("avatar_changed")
+    def on_avatar_changed(data):
+        """Пользователь сменил аватарку — обновляем её у собеседников в звонке."""
+        user = _user()
+        if not user:
+            return _err("unauthorized")
+
+        slug = str((data or {}).get("room", ""))
+        avatar = _avatar_of(user["id"])
+        if not slug or not registry.is_member(slug, user["id"]):
+            return _ok(updated=False)
+
+        # Обновляем аватарку у всех устройств пользователя в этой комнате
+        room = registry._rooms.get(slug)  # noqa: SLF001 — нужен доступ к группе
+        if room and user["id"] in room.peers:
+            for peer in room.peers[user["id"]].values():
+                peer.avatar = avatar
+
+        socketio.emit(
+            "avatar_changed",
+            _ok(room=slug, user_id=user["id"], avatar=avatar),
+            to=_voice_room(slug),
+            skip_sid=request.sid,
+        )
+        return _ok(updated=True)
 
     @socketio.on("voice_media_state")
     def on_voice_media_state(data):
@@ -343,12 +397,12 @@ def register(socketio) -> None:
         slug = str(data.get("room", ""))
         muted = bool(data.get("muted", False))
         camera = bool(data.get("camera", False))
-        if not registry.set_flag(slug, user["id"], "muted", muted):
+        if not registry.set_flag(slug, request.sid, "muted", muted):
             return _err("not_in_voice")
-        registry.set_flag(slug, user["id"], "camera", camera)
+        registry.set_flag(slug, request.sid, "camera", camera)
         socketio.emit(
             "voice_media_state",
-            _ok(room=slug, user_id=user["id"], muted=muted, camera=camera),
+            _ok(room=slug, user_id=user["id"], sid=request.sid, muted=muted, camera=camera),
             to=_voice_room(slug),
         )
         return _ok()
@@ -361,12 +415,12 @@ def register(socketio) -> None:
         data = data or {}
         slug = str(data.get("room", ""))
         audio = bool(data.get("audio", False))
-        if not registry.set_flag(slug, user["id"], "sharing", True):
+        if not registry.set_flag(slug, request.sid, "sharing", True):
             return _err("not_in_voice")
-        registry.set_flag(slug, user["id"], "screen_audio", audio)
+        registry.set_flag(slug, request.sid, "screen_audio", audio)
         socketio.emit(
             "screen_state",
-            _ok(room=slug, user_id=user["id"], sharing=True, audio=audio),
+            _ok(room=slug, user_id=user["id"], sid=request.sid, sharing=True, audio=audio),
             to=_voice_room(slug),
         )
         return _ok(audio=audio)
@@ -377,9 +431,15 @@ def register(socketio) -> None:
         if not user:
             return _err("unauthorized")
         slug = str((data or {}).get("room", ""))
-        registry.set_flag(slug, user["id"], "sharing", False)
-        registry.set_flag(slug, user["id"], "screen_audio", False)
-        socketio.emit("screen_state", _ok(room=slug, user_id=user["id"], sharing=False), to=_voice_room(slug))
+        registry.set_flag(slug, request.sid, "sharing", False)
+        registry.set_flag(slug, request.sid, "screen_audio", False)
+        # sid обязателен: флаг принадлежит устройству, а у человека их может быть
+        # несколько — без него клиент не знает, чью демонстрацию гасить
+        socketio.emit(
+            "screen_state",
+            _ok(room=slug, user_id=user["id"], sid=request.sid, sharing=False),
+            to=_voice_room(slug),
+        )
         return _ok()
 
     # =====================================================================
@@ -397,24 +457,32 @@ def register(socketio) -> None:
 
         data = data or {}
         slug = str(data.get("room", ""))
-        try:
-            target = int(data.get("target"))
-        except (TypeError, ValueError):
-            return _err("bad_target")
 
         if not registry.is_member(slug, user["id"]):
             return _err("not_in_voice")
-        peer = registry.peer(slug, target)
-        if not peer:
-            return _err("target_not_in_voice")
-        if peer.user_id == user["id"]:
+
+        # Устройства одного человека сидят в разных вкладках, поэтому
+        # адресуемся по sid конкретного устройства; user_id остаётся как
+        # запасной вариант для совместимости со старым клиентом.
+        target_sid = data.get("target_sid")
+        peer = registry.peer(slug, target_sid) if target_sid else None
+        if peer is None:
+            try:
+                target_user = int(data.get("target"))
+            except (TypeError, ValueError):
+                return _err("bad_target")
+            candidates = [item for item in registry.participants(slug)
+                          if item["user_id"] == target_user]
+            if not candidates:
+                return _err("target_not_in_voice")
+            peer = registry.peer(slug, candidates[0]["sid"])
+
+        if peer.user_id == user["id"] and peer.sid == request.sid:
             return _err("self_target")
 
-        socketio.emit(
-            event,
-            _ok(**build_payload()),
-            to=peer.sid,
-        )
+        payload = _ok(**build_payload())
+        payload["from_sid"] = request.sid
+        socketio.emit(event, payload, to=peer.sid)
         return _ok()
 
     @socketio.on("offer")
@@ -425,6 +493,7 @@ def register(socketio) -> None:
             lambda: {
                 "from": _user()["id"],
                 "from_username": _user()["username"],
+                "from_sid": request.sid,
                 "sdp": (data or {}).get("sdp"),
                 "room": (data or {}).get("room"),
             },
@@ -437,6 +506,7 @@ def register(socketio) -> None:
             data,
             lambda: {
                 "from": _user()["id"],
+                "from_sid": request.sid,
                 "sdp": (data or {}).get("sdp"),
                 "room": (data or {}).get("room"),
             },
@@ -449,10 +519,19 @@ def register(socketio) -> None:
             data,
             lambda: {
                 "from": _user()["id"],
+                "from_sid": request.sid,
                 "candidate": (data or {}).get("candidate"),
                 "room": (data or {}).get("room"),
             },
         )
+
+
+def _avatar_of(user_id: int) -> dict | None:
+    """Аватарка пользователя для плиток — чтобы она была видна в звонке."""
+    from .models import User
+
+    record = db.session.get(User, user_id)
+    return record.avatar_public() if record else None
 
 
 def get_registry() -> VoiceRegistry:

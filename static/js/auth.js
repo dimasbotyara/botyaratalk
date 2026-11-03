@@ -6,6 +6,7 @@
 import { CONFIG, $, $$, fetchJSON, setCookie, storage, toast } from './utils.js';
 import { applyTranslations, initI18n, t } from './i18n.js';
 import { initTheme } from './theme.js';
+import { MIN_PASSWORD_LENGTH, bindPasswordToggles, updateStrengthMeter } from './password.js';
 
 const state = { mode: 'login', busy: false };
 
@@ -50,12 +51,19 @@ function switchMode(mode) {
 
   const password = $('#auth-password');
   password.autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+
+  // Индикатор сложности имеет смысл только при создании пароля
+  updateStrength(password.value);
   setError('');
+}
+
+function updateStrength(value) {
+  updateStrengthMeter($('#auth-strength'), $('#auth-strength-label'), value, state.mode === 'register');
 }
 
 function validate(username, password, password2) {
   if (username.length < 3) return t('auth.err_username');
-  if (password.length < 6) return t('auth.err_password_short', { min: 6 });
+  if (password.length < MIN_PASSWORD_LENGTH) return t('auth.err_password_short', { min: MIN_PASSWORD_LENGTH });
   if (state.mode === 'register' && password !== password2) return t('auth.err_password_mismatch');
   return null;
 }
@@ -110,6 +118,9 @@ async function init() {
   }
 
   $('#auth-form').addEventListener('submit', submit);
+  bindPasswordToggles();
+  $('#auth-password').addEventListener('input', (event) => updateStrength(event.target.value));
+  switchMode(state.mode);
 
   // Если пользователь уже залогинен — сразу в приложение
   const me = await fetchJSON(CONFIG.urls.me);

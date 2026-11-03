@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.signaling import MAX_VOICE_PARTICIPANTS, VoiceRegistry
+from app.signaling import MAX_VOICE_PARTICIPANTS, RoomFull, VoiceRegistry
 
 
 # --------------------------------------------------------------------------
@@ -30,21 +30,69 @@ def test_registry_join_leave():
     assert [user["username"] for user in registry.participants("channel-1")] == ["bob"]
 
 
-def test_registry_rejoin_same_user_keeps_single_slot():
+def test_registry_same_device_rejoin_is_idempotent():
+    """То же устройство переподключилось — место не дублируется."""
     registry = VoiceRegistry()
     registry.join("channel-3", 7, "carol", "sid-1")
-    before, is_new = registry.join("channel-3", 7, "carol", "sid-2")
+    before, is_new = registry.join("channel-3", 7, "carol", "sid-1")
     assert is_new is False
     assert len(registry.participants("channel-3")) == 1
-    assert registry.peer("channel-3", 7).sid == "sid-2"
+    assert registry.users_count("channel-3") == 1
+
+
+def test_registry_second_device_joins_same_channel():
+    """Тот же аккаунт с другого устройства — второе соединение в том же канале."""
+    registry = VoiceRegistry()
+    registry.join("channel-3", 7, "carol", "sid-phone")
+    before, is_new = registry.join("channel-3", 7, "carol", "sid-laptop")
+
+    assert is_new is True
+    # Оба устройства на месте, но человек по-прежнему один
+    assert len(registry.participants("channel-3")) == 2
+    assert registry.users_count("channel-3") == 1
+    assert len(before) == 1
+
+
+def test_registry_second_device_in_other_channel_moves_user():
+    """Второе устройство в другом канале переносит человека целиком."""
+    registry = VoiceRegistry()
+    registry.join("channel-1", 7, "carol", "sid-phone")
+    registry.join("channel-2", 7, "carol", "sid-laptop")
+
+    # Человек ровно в одном канале, второе устройство добавилось туда же
+    assert registry.rooms_of_user(7) == ["channel-2"]
+    assert registry.participants("channel-1") == []
+    assert registry.users_count("channel-2") == 1
+
+
+def test_registry_leave_one_device_keeps_user_in_channel():
+    """Ушло одно устройство — человек остаётся в канале со второго."""
+    registry = VoiceRegistry()
+    registry.join("channel-1", 7, "carol", "sid-phone")
+    registry.join("channel-1", 7, "carol", "sid-laptop")
+
+    result = registry.leave_device("channel-1", "sid-phone")
+    assert result == (7, False)  # пользователь ещё здесь
+    assert registry.is_member("channel-1", 7) is True
+    assert len(registry.participants("channel-1")) == 1
+
+    result = registry.leave_device("channel-1", "sid-laptop")
+    assert result == (7, True)  # ушёл последним
+    assert registry.is_member("channel-1", 7) is False
 
 
 def test_registry_max_participants():
+    """Лимит считается по людям, а не по устройствам."""
     registry = VoiceRegistry(max_participants=2)
     registry.join("channel-2", 1, "a", "s1")
     registry.join("channel-2", 2, "b", "s2")
-    with pytest.raises(Exception):
+    with pytest.raises(RoomFull):
         registry.join("channel-2", 3, "c", "s3")
+
+    # Второе устройство уже присутствующего человека лимит не нарушает
+    before, is_new = registry.join("channel-2", 1, "a", "s1-second")
+    assert is_new is True
+    assert len(before) == 2
 
 
 def test_registry_leave_all_by_sid():
@@ -54,17 +102,21 @@ def test_registry_leave_all_by_sid():
     registry.join("channel-1", 1, "a", "shared-sid")
     registry.join("channel-2", 2, "b", "shared-sid")
     removed = registry.leave_all("shared-sid")
-    assert sorted(slug for slug, _ in removed) == ["channel-1", "channel-2"]
+    assert sorted(slug for slug, _, _ in removed) == ["channel-1", "channel-2"]
     assert registry.participants("channel-1") == []
     assert registry.participants("channel-2") == []
 
 
 def test_registry_flags():
+    """Флаги принадлежат устройству: у телефона и ноутбука они независимы."""
     registry = VoiceRegistry()
     registry.join("channel-1", 1, "a", "s1")
-    assert registry.set_flag("channel-1", 1, "sharing", True) is True
-    assert registry.peer("channel-1", 1).sharing is True
-    assert registry.set_flag("channel-1", 99, "sharing", True) is False
+    registry.join("channel-1", 1, "a", "s2")
+
+    assert registry.set_flag("channel-1", "s1", "sharing", True) is True
+    assert registry.peer("channel-1", "s1").sharing is True
+    assert registry.peer("channel-1", "s2").sharing is False
+    assert registry.set_flag("channel-1", "nope", "sharing", True) is False
 
 
 # --------------------------------------------------------------------------
@@ -176,10 +228,13 @@ def test_screen_state_events(socket_authed):
 
     from app.sockets import registry
 
-    assert registry.peer("channel-1", user_id).sharing is True
+    # Демонстрация включается конкретным устройством (sid), а не аккаунтом
+    devices = [peer for peer in registry.participants("channel-1") if peer["user_id"] == user_id]
+    assert devices and devices[0]["sharing"] is True
 
     client.emit("screen_stopped", {"room": "channel-1"})
-    assert registry.peer("channel-1", user_id).sharing is False
+    devices = [peer for peer in registry.participants("channel-1") if peer["user_id"] == user_id]
+    assert devices[0]["sharing"] is False
 
 
 def test_max_participants_constant_documented():
@@ -211,7 +266,8 @@ def test_registry_switch_is_atomic():
     registry.join("channel-1", 2, "bob", "sid-b")
 
     meta, users_before, is_new = registry.switch("channel-1", "channel-2", 1, "alice", "sid-a")
-    assert meta["left"] is True
+    # left — результат leave_device: (user_id, ушёл_ли_целиком)
+    assert meta["left"] == (1, True)
     assert is_new is True
     assert users_before == []  # в channel-2 до перехода никого не было
     assert registry.rooms_of_user(1) == ["channel-2"]

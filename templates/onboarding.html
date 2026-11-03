@@ -17,13 +17,13 @@
         <span class="step-dot__num">1</span>
         <span data-i18n="onboarding.lang.title">Language</span>
       </span>
-      <span class="step-dot" role="listitem" data-step-dot="theme" data-state="upcoming">
+      <span class="step-dot" role="listitem" data-step-dot="account" data-state="upcoming">
         <span class="step-dot__num">2</span>
-        <span data-i18n="onboarding.theme.title">Theme</span>
+        <span data-i18n="onboarding.account.title">Account</span>
       </span>
-      <span class="step-dot" role="listitem" data-step-dot="register" data-state="upcoming">
+      <span class="step-dot" role="listitem" data-step-dot="theme" data-state="upcoming">
         <span class="step-dot__num">3</span>
-        <span data-i18n="auth.register">Sign up</span>
+        <span data-i18n="onboarding.theme.title">Theme</span>
       </span>
     </div>
   </header>
@@ -56,11 +56,95 @@
       <div class="onboarding__footer">
         <span class="onboarding__hint" data-i18n="common.step" data-i18n-params='{"current": 1, "total": 3}'>Step 1 of 3</span>
         <div class="onboarding__footer-right">
-          <button type="button" class="btn btn--primary" data-action="next" data-from="lang">
+          <button type="button" class="btn btn--primary" data-action="next" data-from="lang" data-to="account">
             <span data-i18n="common.next">Next</span>
             <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
           </button>
         </div>
+      </div>
+    </section>
+
+    {# ---------- Step 2: account — sign in OR sign up ---------- #}
+    <section class="onboarding__panel" data-panel="account" aria-labelledby="ob-account-title" hidden>
+      <h1 class="onboarding__title" id="ob-account-title" data-i18n="onboarding.account.title">Your account</h1>
+      <p class="onboarding__subtitle" data-i18n="onboarding.account.subtitle">Sign in to an existing account or create a new one.</p>
+
+      <div class="account-tabs" role="tablist">
+        <button type="button" class="account-tab is-active" role="tab" aria-selected="true"
+                data-account-mode="login" data-i18n="auth.login">Sign in</button>
+        <button type="button" class="account-tab" role="tab" aria-selected="false"
+                data-account-mode="register" data-i18n="auth.register">Sign up</button>
+      </div>
+
+      <div class="register-layout">
+        <form class="register-form" id="onboarding-form" data-mode="login" novalidate>
+          <div class="field">
+            <label class="field__label" for="ob-username" data-i18n="auth.username">Nickname</label>
+            <input class="input" id="ob-username" name="username" type="text" autocomplete="username"
+                   minlength="3" maxlength="32" required data-i18n-placeholder="auth.username_placeholder">
+            <span class="field__hint" data-i18n="auth.username_hint">3–32 characters: letters, digits, _ and -</span>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="ob-password" data-i18n="auth.password">Password</label>
+            <div class="password-field">
+              <input class="input" id="ob-password" name="password" type="password" autocomplete="current-password"
+                     minlength="6" required data-i18n-placeholder="auth.password_placeholder">
+              <button type="button" class="password-toggle" data-password-toggle="ob-password"
+                      aria-pressed="false" data-i18n-aria-label="auth.show_password"
+                      data-i18n-title="auth.show_password">
+                <svg class="icon" aria-hidden="true"><use href="#i-eye"></use></svg>
+              </button>
+            </div>
+
+            <div class="password-strength" id="ob-strength" data-score="0" hidden>
+              <div class="password-strength__bars" aria-hidden="true">
+                <span></span><span></span><span></span><span></span>
+              </div>
+              <span class="password-strength__label" id="ob-strength-label"></span>
+            </div>
+            <span class="field__hint" data-i18n="auth.password_hint">At least 6 characters. Longer and more varied is better.</span>
+          </div>
+
+          <div class="field" id="ob-password2-field" hidden>
+            <label class="field__label" for="ob-password2" data-i18n="auth.password2">Repeat password</label>
+            <div class="password-field">
+              <input class="input" id="ob-password2" name="password2" type="password" autocomplete="new-password"
+                     minlength="6">
+              <button type="button" class="password-toggle" data-password-toggle="ob-password2"
+                      aria-pressed="false" data-i18n-aria-label="auth.show_password"
+                      data-i18n-title="auth.show_password">
+                <svg class="icon" aria-hidden="true"><use href="#i-eye"></use></svg>
+              </button>
+            </div>
+          </div>
+
+          <p class="auth-form__error" id="ob-error" role="alert" aria-live="assertive"></p>
+
+          <div class="onboarding__footer">
+            <button type="button" class="btn btn--ghost" data-action="back" data-to="lang">
+              <svg class="icon" aria-hidden="true"><use href="#i-arrow-left"></use></svg>
+              <span data-i18n="common.back">Back</span>
+            </button>
+            <button type="submit" class="btn btn--primary" id="ob-submit">
+              <svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>
+              <span id="ob-submit-label" data-i18n="auth.submit_login">Sign in</span>
+            </button>
+          </div>
+        </form>
+
+        <aside class="register-preview" aria-hidden="true">
+          <span class="register-preview__title" data-i18n="onboarding.welcome">Welcome</span>
+          <div class="register-preview__row">
+            <span class="avatar avatar--lg" id="ob-preview-avatar">?</span>
+            <span class="register-preview__name" id="ob-preview-name">—</span>
+          </div>
+          <span class="register-preview__note" data-i18n="onboarding.account.subtitle">Sign in to an existing account or create a new one.</span>
+          <span class="badge badge--accent">
+            <svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg>
+            <span>LAN</span>
+          </span>
+        </aside>
       </div>
     </section>
 
@@ -73,7 +157,7 @@
       <div class="theme-groups" id="theme-groups"></div>
 
       <div class="onboarding__footer">
-        <button type="button" class="btn btn--ghost" data-action="back" data-to="lang">
+        <button type="button" class="btn btn--ghost" data-action="back" data-to="account">
           <svg class="icon" aria-hidden="true"><use href="#i-arrow-left"></use></svg>
           <span data-i18n="common.back">Back</span>
         </button>
@@ -83,71 +167,11 @@
             <svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>
             <span data-i18n="common.apply">Apply</span>
           </button>
-          <button type="button" class="btn btn--primary" data-action="next" data-from="theme">
+          <button type="button" class="btn btn--primary" data-action="finish">
             <span data-i18n="common.next">Next</span>
             <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
           </button>
         </div>
-      </div>
-    </section>
-
-    {# ---------- Step 3: sign up ---------- #}
-    <section class="onboarding__panel" data-panel="register" aria-labelledby="ob-register-title" hidden>
-      <h1 class="onboarding__title" id="ob-register-title" data-i18n="onboarding.register.title">Create your account</h1>
-      <p class="onboarding__subtitle" data-i18n="onboarding.register.subtitle">Local account.</p>
-
-      <div class="register-layout">
-        <form class="register-form" id="onboarding-form" novalidate>
-          <div class="field">
-            <label class="field__label" for="ob-username" data-i18n="auth.username">Nickname</label>
-            <input class="input" id="ob-username" name="username" type="text" autocomplete="username"
-                   minlength="3" maxlength="32" required data-i18n-placeholder="auth.username_placeholder">
-            <span class="field__hint" data-i18n="auth.err_username">3–32 characters</span>
-          </div>
-
-          <div class="field">
-            <label class="field__label" for="ob-password" data-i18n="auth.password">Password</label>
-            <input class="input" id="ob-password" name="password" type="password" autocomplete="new-password"
-                   minlength="6" required data-i18n-placeholder="auth.password_placeholder">
-            <div class="password-meter" aria-hidden="true">
-              <span class="password-meter__bar"></span>
-              <span class="password-meter__bar"></span>
-              <span class="password-meter__bar"></span>
-            </div>
-          </div>
-
-          <div class="field">
-            <label class="field__label" for="ob-password2" data-i18n="auth.password2">Repeat password</label>
-            <input class="input" id="ob-password2" name="password2" type="password" autocomplete="new-password"
-                   minlength="6" required>
-          </div>
-
-          <p class="auth-form__error" id="ob-error" role="alert" aria-live="assertive"></p>
-
-          <div class="onboarding__footer">
-            <button type="button" class="btn btn--ghost" data-action="back" data-to="theme">
-              <svg class="icon" aria-hidden="true"><use href="#i-arrow-left"></use></svg>
-              <span data-i18n="common.back">Back</span>
-            </button>
-            <button type="submit" class="btn btn--primary" id="ob-submit">
-              <svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg>
-              <span data-i18n="onboarding.register.action">Create and sign in</span>
-            </button>
-          </div>
-        </form>
-
-        <aside class="register-preview" aria-hidden="true">
-          <span class="register-preview__title" data-i18n="onboarding.welcome">Welcome</span>
-          <div class="register-preview__row">
-            <span class="avatar avatar--lg" id="ob-preview-avatar">?</span>
-            <span class="register-preview__name" id="ob-preview-name">—</span>
-          </div>
-          <span class="register-preview__note" data-i18n="onboarding.register.subtitle">Local account.</span>
-          <span class="badge badge--accent">
-            <svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg>
-            <span>LAN</span>
-          </span>
-        </aside>
       </div>
     </section>
 

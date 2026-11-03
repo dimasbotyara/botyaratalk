@@ -372,30 +372,40 @@
   color: var(--fg-muted);
 }
 
-.password-meter {
-  display: flex;
-  gap: 4px;
+/* --- Шаг 2: аккаунт ------------------------------------------------- */
+.account-tabs {
+  display: inline-flex;
+  gap: 2px;
+  margin-top: var(--space-4);
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg-alt);
 }
 
-.password-meter__bar {
-  height: 4px;
-  flex: 1 1 auto;
-  border-radius: 2px;
-  background: var(--border);
-  transition: background var(--t-fast);
+.account-tab {
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
 }
 
-.password-meter__bar[data-filled="1"] {
-  background: var(--danger);
+.account-tab:hover {
+  color: var(--fg);
 }
 
-.password-meter__bar[data-filled="2"] {
-  background: var(--warning);
+.account-tab.is-active {
+  background: var(--accent);
+  color: var(--accent-fg);
 }
 
-.password-meter__bar[data-filled="3"] {
-  background: var(--success);
-}
+/* Поле пароля и индикатор сложности — в auth.css (общие с /auth) */
 
 /* Выбранный язык/тема в шапке визарда */
 .onboarding__chips {

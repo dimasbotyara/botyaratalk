@@ -2,21 +2,21 @@
 <aside class="voice-panel" id="voice-panel" data-open="false" aria-labelledby="voice-panel-title">
   <header class="voice-panel__header">
     <svg class="icon" aria-hidden="true"><use href="#i-headphones"></use></svg>
-    <span class="voice-panel__title" id="voice-panel-title" data-i18n="room.voice_channel">Voice channel</span>
+    <span class="voice-panel__title" id="voice-panel-title" data-i18n="room.voice_channel_short">Voice</span>
     <span class="badge voice-panel__count" id="voice-count" hidden>0</span>
 
     <div class="voice-panel__actions">
-      <button type="button" class="btn btn--icon btn--ghost btn--sm" id="voice-pin"
+      <button type="button" class="voice-panel__action" id="voice-pin"
               aria-pressed="false" data-i18n-aria-label="voice.pin" data-i18n-title="voice.pin">
-        <svg class="icon" aria-hidden="true"><use href="#i-expand"></use></svg>
+        <svg class="icon" aria-hidden="true"><use href="#i-pin"></use></svg>
       </button>
-      <button type="button" class="btn btn--icon btn--ghost btn--sm" id="voice-fullscreen"
+      <button type="button" class="voice-panel__action" id="voice-fullscreen"
               aria-pressed="false" data-i18n-aria-label="voice.fullscreen" data-i18n-title="voice.fullscreen">
-        <svg class="icon" aria-hidden="true"><use href="#i-maximize"></use></svg>
+        <svg class="icon" aria-hidden="true"><use href="#i-fullscreen"></use></svg>
       </button>
-      <button type="button" class="btn btn--icon btn--ghost btn--sm" id="close-voice-panel"
-              data-i18n-aria-label="common.close" data-i18n-title="common.close">
-        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      <button type="button" class="voice-panel__action voice-panel__action--close" id="close-voice-panel"
+              data-i18n-aria-label="voice.close_panel" data-i18n-title="voice.close_panel">
+        <svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>
       </button>
     </div>
   </header>
@@ -55,9 +55,9 @@
       <svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg>
     </button>
 
-    <button type="button" class="ctrl-btn" id="btn-monitor" aria-pressed="false"
-            data-i18n-aria-label="voice.monitor_on" data-i18n-title="voice.monitor_on">
-      <svg class="icon" aria-hidden="true"><use href="#i-headphones"></use></svg>
+    <button type="button" class="ctrl-btn" id="btn-deafen" aria-pressed="false"
+            data-i18n-aria-label="voice.deafen" data-i18n-title="voice.deafen">
+      <svg class="icon" aria-hidden="true"><use href="#i-ear-off"></use></svg>
     </button>
 
     <button type="button" class="ctrl-btn" id="btn-camera" aria-pressed="false"
@@ -70,9 +70,9 @@
       <svg class="icon" aria-hidden="true"><use href="#i-screen"></use></svg>
     </button>
 
-    <button type="button" class="ctrl-btn ctrl-btn--danger ctrl-btn--wide" id="btn-leave"
+    <button type="button" class="ctrl-btn ctrl-btn--danger ctrl-btn--hangup" id="btn-leave"
             data-i18n-aria-label="voice.leave" data-i18n-title="voice.leave">
-      <svg class="icon" aria-hidden="true"><use href="#i-phone-off"></use></svg>
+      <svg class="icon" aria-hidden="true"><use href="#i-hangup"></use></svg>
       <span data-i18n="voice.leave">Disconnect</span>
     </button>
   </div>

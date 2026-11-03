@@ -261,5 +261,29 @@ def test_stage_module_and_layout_hooks():
         assert selector in css, f"в voice.css нет {selector}"
 
     template = (ROOT / "templates" / "partials" / "voice-bar.html").read_text(encoding="utf-8")
-    for element_id in ("voice-pin", "voice-fullscreen", "voice-exit-fullscreen", "btn-monitor"):
+    # Кнопки панели: закрепить, развернуть, свернуть, заглушить звук, выйти
+    for element_id in ("voice-pin", "voice-fullscreen", "voice-exit-fullscreen", "btn-deafen", "btn-leave"):
         assert f'id="{element_id}"' in template, f"нет кнопки {element_id}"
+
+
+def test_default_port_is_documented_everywhere():
+    """Порт по умолчанию задаётся в одном месте и совпадает с документацией.
+
+    Раньше 5000 было вписано в run.py, README, AUDIT и Makefile — при смене
+    порта легко забыть один из файлов и получить «запускаюсь не туда».
+    """
+    from config import DEFAULT_PORT
+
+    assert DEFAULT_PORT == 14098
+
+    run_py = (ROOT / "run.py").read_text(encoding="utf-8")
+    assert "DEFAULT_PORT" in run_py, "run.py должен брать порт из config.py"
+    assert "5000" not in run_py, "в run.py остался старый порт 5000"
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert f"BOTYARATALK_PORT` | `{DEFAULT_PORT}`" in readme, "порт в таблице README"
+    assert f":{DEFAULT_PORT}" in readme, "порт в примерах README"
+    assert ":5000" not in readme, "в README остался старый порт 5000"
+
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    assert str(DEFAULT_PORT) in makefile, "порт в подсказке Makefile"

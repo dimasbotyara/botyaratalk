@@ -5,11 +5,11 @@ PY ?= python3
 
 help:
 	@echo "make install      — установить зависимости"
-	@echo "make run          — запустить сервер на 0.0.0.0:5000"
+	@echo "make run          — запустить сервер на 0.0.0.0:14098"
 	@echo "make test         — pytest"
 	@echo "make e2e          — сквозной тест WebRTC (два браузера)"
 	@echo "make lint         — ruff"
-	@echo "make screenshots  — снять 15 скриншотов Playwright"
+	@echo "make screenshots  — снять 23 скриншота Playwright"
 	@echo "make seed         — создать/проверить комнаты"
 	@echo "make clean        — удалить базу и скриншоты"
 

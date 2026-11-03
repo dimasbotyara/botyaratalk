@@ -21,7 +21,7 @@ Flask + Socket.IO + vanilla ES-modules frontend, SQLite storage, 10 themes, Engl
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-python run.py                   # → https://0.0.0.0:5000
+python run.py                   # → https://0.0.0.0:14098
 ```
 
 Open the printed `https://…` address (the browser asks you to trust the local certificate once).
@@ -42,27 +42,74 @@ older build is automatic: `app/db.py::migrate_db()` adds the missing columns
 idempotently — your old database is never recreated. Need plain HTTP (for
 localhost-only debugging)? `BOTYARATALK_HTTPS=0 python run.py`.
 
-To open the app from another device on the same LAN just use the `https://<server-ip>:5000`
+To open the app from another device on the same LAN just use the `https://<server-ip>:14098`
 address printed at startup — see [HTTPS and LAN](#https-and-lan) for certificate details.
 
 ```bash
 python scripts/seed_rooms.py        # (re)create the rooms, idempotent
 pytest tests/ -q                    # backend test suite
 python tests/e2e_two_peers.py       # real WebRTC E2E with two browser contexts
-python scripts/take_screenshots.py  # 21 PNGs into screenshots/
+python scripts/take_screenshots.py  # 23 PNGs into screenshots/
 ```
 
 ---
 
 ## Screenshots
 
-| Onboarding: language | Onboarding: theme |
+| Onboarding 1/3: language | Onboarding 2/3: sign in |
 |---|---|
-| ![Language](screenshots/onboarding-step-lang.png) | ![Theme](screenshots/onboarding-step-theme.png) |
+| ![Language](screenshots/onboarding-step-lang.png) | ![Sign in](screenshots/onboarding-step-login.png) |
 
-| Onboarding: sign-up | Chat with a message |
+| Onboarding 2/3: sign up (strength meter, password reveal) | Onboarding 3/3: theme |
 |---|---|
-| ![Register](screenshots/onboarding-step-register.png) | ![Chat](screenshots/chat-with-message.png) |
+| ![Register](screenshots/onboarding-step-register.png) | ![Theme](screenshots/onboarding-step-theme.png) |
+
+| Chat with a message (avatars everywhere) | Reply, reactions, link card |
+|---|---|
+| ![Chat](screenshots/chat-with-message.png) | ![Replies and reactions](screenshots/chat-reply-reactions.png) |
+
+| Message context menu | Avatar: crop in the browser |
+|---|---|
+| ![Context menu](screenshots/chat-context-menu.png) | ![Avatar upload](screenshots/avatar-upload.png) |
+
+| Avatar: generated 32×32 pattern | Settings — devices & RNNoise |
+|---|---|
+| ![Avatar generator](screenshots/avatar-generate.png) | ![Settings](screenshots/settings-modal.png) |
+
+| Voice call with camera on | Deafen and hang-up controls |
+|---|---|
+| ![Camera](screenshots/app-voice-video-on.png) | ![Voice channel](screenshots/voice-channel.png) |
+
+| Screen sharing (peer + audio badge) | Same account on a second device («×2») |
+|---|---|
+| ![Screen sharing](screenshots/app-screen-sharing.png) | ![Multi-device](screenshots/app-voice-multidevice.png) |
+
+| Pinned voice zone (chat hidden, screen on top) | Fullscreen voice stage |
+|---|---|
+| ![Pinned](screenshots/app-voice-pinned.png) | ![Fullscreen](screenshots/app-voice-fullscreen.png) |
+
+| Device pickers | Theme picker in settings |
+|---|---|
+| ![Devices](screenshots/settings-devices.png) | ![Themes](screenshots/settings-appearance.png) |
+
+| Themes — Catppuccin Latte | Gruvbox Dark | Ayu Mirage |
+|---|---|---|
+| ![Latte](screenshots/app-light-catppuccin-latte.png) | ![Gruvbox](screenshots/app-dark-gruvbox.png) | ![Ayu](screenshots/app-ayu-mirage.png) |
+
+| UI switched to English | Mobile (390 px) |
+|---|---|
+| ![English](screenshots/app-i18n-english.png) | ![Mobile](screenshots/settings-mobile.png) |
+
+---|---|
+| ![Language](screenshots/onboarding-step-lang.png) | ![Sign in](screenshots/onboarding-step-login.png) |
+
+| Onboarding 2/3: sign up (strength meter, password reveal) | Onboarding 3/3: theme |
+|---|---|
+| ![Register](screenshots/onboarding-step-register.png) | ![Theme](screenshots/onboarding-step-theme.png) |
+
+| Chat with a message (avatars everywhere) | Reply, reactions, link card |
+|---|---|
+| ![Chat](screenshots/chat-with-message.png) | ![Replies and reactions](screenshots/chat-reply-reactions.png) |
 
 | Reply, reactions, link card | Message context menu |
 |---|---|
@@ -72,29 +119,33 @@ python scripts/take_screenshots.py  # 21 PNGs into screenshots/
 |---|---|
 | ![Avatar upload](screenshots/avatar-upload.png) | ![Avatar generator](screenshots/avatar-generate.png) |
 
-| Voice channel | Voice call with camera on |
+| Voice call with camera on | Pinned voice zone (chat hidden, screen on top) |
 |---|---|
-| ![Voice channel](screenshots/voice-channel.png) | ![Camera](screenshots/app-voice-video-on.png) |
+| ![Camera](screenshots/app-voice-video-on.png) | ![Pinned](screenshots/app-voice-pinned.png) |
 
-| Screen sharing (peer + audio badge) | Device pickers |
+| Screen sharing (peer + audio badge) | Same account on a second device («×2») |
 |---|---|
-| ![Screen sharing](screenshots/app-screen-sharing.png) | ![Devices](screenshots/settings-devices.png) |
+| ![Screen sharing](screenshots/app-screen-sharing.png) | ![Multi-device](screenshots/app-voice-multidevice.png) |
 
-| Pinned voice zone (chat hidden, screen on top) | Fullscreen voice stage |
+| Device pickers | Deafen and hang-up controls |
 |---|---|
-| ![Pinned](screenshots/app-voice-pinned.png) | ![Fullscreen](screenshots/app-voice-fullscreen.png) |
+| ![Devices](screenshots/settings-devices.png) | ![Voice channel](screenshots/voice-channel.png) |
 
-| Settings — devices & RNNoise | Settings on a 768 px screen |
+| Fullscreen voice stage | Theme picker in settings |
 |---|---|
-| ![Settings](screenshots/settings-modal.png) | ![Mobile settings](screenshots/settings-mobile.png) |
+| ![Fullscreen](screenshots/app-voice-fullscreen.png) | ![Themes](screenshots/settings-appearance.png) |
+
+| Settings — devices & RNNoise | | 
+|---|---|
+| ![Settings](screenshots/settings-modal.png) | |
 
 | Themes — Catppuccin Latte | Gruvbox Dark | Ayu Mirage |
 |---|---|---|
 | ![Latte](screenshots/app-light-catppuccin-latte.png) | ![Gruvbox](screenshots/app-dark-gruvbox.png) | ![Ayu](screenshots/app-ayu-mirage.png) |
 
-| Theme picker in settings | UI switched to English |
+| UI switched to English | Mobile (390 px) |
 |---|---|
-| ![Themes](screenshots/settings-appearance.png) | ![English](screenshots/app-i18n-english.png) |
+| ![English](screenshots/app-i18n-english.png) | ![Mobile](screenshots/settings-mobile.png) |
 
 ---
 
@@ -102,8 +153,9 @@ python scripts/take_screenshots.py  # 21 PNGs into screenshots/
 
 | Area | What it does |
 |---|---|
-| Onboarding | 3-step wizard: language → theme with a live preview → sign-up |
-| Accounts | register / sign in, `pbkdf2:sha256` hashes, signed-cookie sessions |
+| Onboarding | 3-step wizard in a fixed order: language → account (**sign in or sign up**) → theme with a live preview |
+| Accounts | register / sign in with the same form, `pbkdf2:sha256` hashes, signed-cookie sessions |
+| Passwords | minimum 6 characters; a live strength meter (length, character classes, repetition penalty) and a show/hide toggle on every password field |
 | Channels | 3 rooms, each with one text channel and one voice channel, grouped into **Text channels** / **Voice channels** categories in the sidebar |
 | Text chat | SQLite history (last 100), browser notifications, unread badges, date separators («Today» / «Yesterday» / a date) |
 | Replies | right-click a message → **Reply**; the quote above the input is clickable and jumps to the original |
@@ -112,11 +164,12 @@ python scripts/take_screenshots.py  # 21 PNGs into screenshots/
 | Markdown | `**bold**`, `*italic*`, `~~strike~~`, `` `code` ``, fenced blocks, quotes, lists — rendered from escaped text, so no HTML injection |
 | Links | bare domains get `https://` (never doubled), clickable; a card with the real page title is fetched through `/api/link-preview` |
 | Avatars | upload ≤ 2 MB and crop in the browser (drag + zoom), **or** generate a 32×32 pixel pattern: palette, pixel density, reproducible seed (text seeds allowed), regenerate button |
-| Voice | WebRTC mesh, up to 8 peers, speaking indicator, mute |
+| Voice | WebRTC mesh, up to 8 people, speaking indicator, mute, **deafen** |
+| Multi-device | the same account can join from a phone and a laptop at once — both in the same channel; one person still means one channel, and their devices collapse into a single tile marked «×2» |
 | Video | 720p camera, toggled live via `replaceTrack` |
 | Screen | `getDisplayMedia` **with system audio**, own transceiver, "sharing + audio" badge |
 | Audio | native constraints **+ local RNNoise (WASM)** in an AudioWorklet, 0–200 % gain, VU meter |
-| Hearing yourself | headphones button right in the call: you hear your processed mic, peers are muted for you and cannot hear you |
+| Deafen | one button in the call: your mic is off **and** you cannot hear the others; the previous mute state is restored when you switch it off |
 | Voice layout | side panel → **pinned** over the chat → **fullscreen** stage; click a tile to enlarge it, the rest slide down |
 | Picture in picture | native PiP button on every video tile (Firefox always, Chromium where the API allows) |
 | Devices | microphone / camera / speaker pickers (`setSinkId`), output volume |
@@ -161,7 +214,7 @@ botyaratalk/
 ├── tests/                     # pytest suite + e2e_two_peers.py
 ├── AUDIT.md                   # audit log: what was found and fixed
 ├── DECISIONS.md               # why things are built this way
-└── screenshots/               # 21 PNGs produced by Playwright
+└── screenshots/               # 23 PNGs produced by Playwright
 ```
 
 Frontend modules: `main`, `socket`, `rooms`, `textchat`, `message`, `markdown`,
@@ -212,12 +265,33 @@ it takes most of the surface and the other participants slide into a small strip
 `Esc` steps back from fullscreen. Picking a **text** channel returns the chat and the normal layout —
 voice channels and text channels are now independent, a voice click never switches the chat.
 
-### Hearing yourself in a call
+### Deafen
 
-The headphones button in the voice controls enables a local monitor of your **processed** mic
-(RNNoise included, so you hear exactly what peers hear). While it is on, your outgoing track is
-disabled and incoming peer audio is muted for you — no acoustic feedback, and nobody hears you.
-The setting is per-call and resets when you disconnect.
+The ear-off button in the voice controls does two things at once, like *Deafen* in Discord:
+the outgoing mic track is disabled (peers stop hearing you) and every incoming audio element is
+set to `volume = 0` (you stop hearing them). Your previous mute state is remembered in
+`mutedBeforeDeafen`, so leaving deafen restores it instead of force-enabling the mic.
+Peers receive a regular `voice_media_state` with `muted: true` — for them it looks like mute.
+
+### Several devices, one account
+
+The signalling registry is keyed by **socket id**, not user id:
+
+```
+VoiceRegistry.peers: dict[user_id, dict[sid, VoicePeer]]
+```
+
+So a phone and a laptop can sit in the same voice channel under one account. The invariant from
+round 4 is intact — a person is still in exactly one voice channel — but inside that channel they
+may hold several devices. `offer` / `answer` / `ice_candidate` carry `target_sid` (and the reply
+carries `from_sid`), and `voice_device_left` means "one device left, the person is still here"
+while `voice_user_left` means "the person went away entirely".
+
+In the UI those devices collapse into **one tile** with a «×2» badge: each tile has a
+representative entry, and when that entry leaves the tile moves to the next device instead of
+flickering. Participant counters (`groupedRoster`) and the sidebar badge count people, not
+connections. The price is a full mesh — two devices per person means more peer connections, and
+the 8-person limit is a limit on people.
 
 ### Picture in picture
 
@@ -308,7 +382,7 @@ back to HTTP instead of failing silently.
 chrome://flags/#unsafely-treat-insecure-origin-as-secure
 ```
 ```bash
-google-chrome --unsafely-treat-insecure-origin-as-secure=http://192.168.1.50:5000
+google-chrome --unsafely-treat-insecure-origin-as-secure=http://192.168.1.50:14098
 ```
 
 **Firefox** — in `about:config`:
@@ -319,9 +393,9 @@ media.getusermedia.insecure.enabled = true
 
 **Mobile browsers** only accept HTTPS. Either trust the generated certificate or use a tunnel:
 ```bash
-cloudflared tunnel --url http://localhost:5000
+cloudflared tunnel --url http://localhost:14098
 # or
-ngrok http 5000
+ngrok http 14098
 ```
 (iOS never exposes system audio for screen sharing — that is an OS limitation.)
 
@@ -334,12 +408,14 @@ so the app degrades gracefully instead of breaking silently.
 pytest tests/ -q
 ```
 
-83 tests across five files:
+86 tests across five files:
 
-* `test_auth.py` — registration, validation, duplicates, login/logout, redirects, i18n endpoint.
+* `test_auth.py` — registration, validation, duplicates, login/logout, redirects, i18n endpoint,
+  and the onboarding order (language → account with both tabs → theme).
 * `test_rooms.py` — room seeding, channel keys, history, limits, integrity of all 10 CSS themes.
-* `test_socket_chat.py` — `VoiceRegistry` unit tests (including the *one user — one voice
-  channel* invariant), Socket.IO chat/signaling checks, live channel switching.
+* `test_socket_chat.py` — `VoiceRegistry` unit tests: sid-keyed devices, the *one user — one voice
+  channel* invariant, a second device joining the same channel, per-device leave, per-device flags,
+  the people-based participant limit; plus Socket.IO chat/signaling checks and live switching.
 * `test_chat_features.py` — link normalization (11 cases, `mailto:`/`v1.2.3` stay plain
   text), reply quoting, reactions add/toggle, cross-room replies rejected, avatar
   generator determinism and clamping, PNG upload/reset, and the schema migration that
@@ -358,10 +434,13 @@ Tests use `TestConfig`: in-memory SQLite and `async_mode="threading"`.
 python tests/e2e_two_peers.py
 ```
 
-27 assertions: joining, bidirectional audio, camera, mute badge, screen sharing video,
-**screen-sharing audio verified through `getStats()`**, camera and screen living in separate
-tiles, voice-channel click not touching the chat, fullscreen stage, tile spotlight, `Esc`,
-self-monitor muting both directions, returning to the chat, stop sharing, leaving the call.
+39 assertions: signing up and signing in through the new onboarding, joining, bidirectional
+audio, camera, mute badge, screen sharing video, **screen-sharing audio verified through
+`getStats()`**, camera and screen living in separate tiles, voice-channel click not touching the
+chat, fullscreen stage, tile spotlight, `Esc`, **deafen muting both directions and restoring the
+previous mute state**, returning to the chat, stop sharing, leaving the call, and a **multi-device
+block**: a second device of the same account joining the same channel, one tile marked «×2», the
+counter still showing one person, and the tile dropping back to «×1» when that device leaves.
 
 **Linting**
 
@@ -378,7 +457,7 @@ Environment variables (all optional):
 | Variable | Default | Meaning |
 |---|---|---|
 | `BOTYARATALK_HOST` | `0.0.0.0` | bind address |
-| `BOTYARATALK_PORT` | `5000` | port |
+| `BOTYARATALK_PORT` | `14098` | port |
 | `BOTYARATALK_DB` | `sqlite:///instance/botyaratalk.db` | database URI |
 | `BOTYARATALK_SECRET_KEY` | `instance/secret.key` | session signing key |
 | `BOTYARATALK_ASYNC_MODE` | `gevent` | `gevent` or `threading` |

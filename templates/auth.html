@@ -59,15 +59,36 @@
 
         <div class="field">
           <label class="field__label" for="auth-password" data-i18n="auth.password">Password</label>
-          <input class="input" id="auth-password" name="password" type="password"
-                 autocomplete="current-password" required minlength="6"
-                 data-i18n-placeholder="auth.password_placeholder">
+          <div class="password-field">
+            <input class="input" id="auth-password" name="password" type="password"
+                   autocomplete="current-password" required minlength="6"
+                   data-i18n-placeholder="auth.password_placeholder">
+            <button type="button" class="password-toggle" data-password-toggle="auth-password"
+                    aria-pressed="false" data-i18n-aria-label="auth.show_password"
+                    data-i18n-title="auth.show_password">
+              <svg class="icon" aria-hidden="true"><use href="#i-eye"></use></svg>
+            </button>
+          </div>
+
+          <div class="password-strength" id="auth-strength" data-score="0" hidden>
+            <div class="password-strength__bars" aria-hidden="true">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <span class="password-strength__label" id="auth-strength-label"></span>
+          </div>
         </div>
 
         <div class="field" id="auth-password2-field" hidden>
           <label class="field__label" for="auth-password2" data-i18n="auth.password2">Repeat password</label>
-          <input class="input" id="auth-password2" name="password2" type="password"
-                 autocomplete="new-password" minlength="6">
+          <div class="password-field">
+            <input class="input" id="auth-password2" name="password2" type="password"
+                   autocomplete="new-password" minlength="6">
+            <button type="button" class="password-toggle" data-password-toggle="auth-password2"
+                    aria-pressed="false" data-i18n-aria-label="auth.show_password"
+                    data-i18n-title="auth.show_password">
+              <svg class="icon" aria-hidden="true"><use href="#i-eye"></use></svg>
+            </button>
+          </div>
         </div>
 
         <p class="auth-form__error" id="auth-error" role="alert" aria-live="assertive"></p>

@@ -71,16 +71,17 @@ def wait_for_server(url: str, timeout: float = 40.0) -> bool:
 
 
 def clean_artifacts() -> None:
+    """Чистит только каталог скриншотов.
+
+    Раньше здесь удалялась ещё и ``instance/botyaratalk.db``. Скрипт может
+    запускаться при живом dev-сервере, и тогда удаление файла оставляло сервер
+    с открытым дескриптором: SQLite отвечал «attempt to write a readonly
+    database» на любую запись, то есть регистрация и сообщения падали.
+    База скриншотам не нужна — они работают на своей временной БД.
+    """
     if SCREENSHOTS.exists():
         shutil.rmtree(SCREENSHOTS)
     SCREENSHOTS.mkdir(parents=True, exist_ok=True)
-
-    instance = ROOT / "instance"
-    instance.mkdir(exist_ok=True)
-    for name in ("botyaratalk.db", "botyaratalk.db-wal", "botyaratalk.db-shm", "screenshots.db"):
-        path = instance / name
-        if path.exists():
-            path.unlink()
 
 
 def start_server(port: int, db_path: Path) -> subprocess.Popen:
@@ -132,28 +133,34 @@ class Shooter:
         self.settle(500)
         self.shoot("onboarding-step-lang.png")
 
-    def step_theme(self) -> None:
+    def step_account(self) -> None:
+        """Шаг аккаунта: вкладка входа и вкладка регистрации."""
         self.page.click('[data-action="next"][data-from="lang"]')
         self.settle(400)
-        # Выбираем Catppuccin Mocha — по умолчанию она и так активна,
-        # но клик гарантирует состояние «выбрана» в превью
-        card = self.page.locator('[data-theme-card="catppuccin-mocha"]')
-        if card.count():
-            card.first.click()
-            self.settle(200)
-        self.shoot("onboarding-step-theme.png")
 
-    def step_register(self) -> None:
-        self.page.click('[data-action="next"][data-from="theme"]')
-        self.settle(400)
+        # Вход существующим аккаунтом — тот самый сценарий «другое устройство»
+        self.shoot("onboarding-step-login.png")
+
+        self.page.click('[data-account-mode="register"]')
+        self.settle(300)
         self.page.fill("#ob-username", USERNAME)
         self.page.fill("#ob-password", PASSWORD)
         self.page.fill("#ob-password2", PASSWORD)
-        self.settle(200)
+        self.settle(250)
         self.shoot("onboarding-step-register.png")
 
-    def register(self) -> None:
+    def step_theme(self) -> None:
+        """Тема идёт последней: она уже на выбранном языке."""
         self.page.click("#ob-submit")
+        self.settle(900)
+        card = self.page.locator('[data-theme="catppuccin-mocha"]')
+        if card.count():
+            card.first.click()
+            self.settle(250)
+        self.shoot("onboarding-step-theme.png")
+
+    def register(self) -> None:
+        self.page.click('[data-action="finish"]')
         self.page.wait_for_url(f"{self.base}/app", timeout=15000)
         # Ждём полной инициализации (dataset.ready ставит main.js)
         self.page.wait_for_function("document.body.dataset.ready === 'true'", timeout=15000)
@@ -275,6 +282,34 @@ class Shooter:
             return False
 
 
+def _login_peer(browser, base_url: str, username: str, password: str):
+    """Вход существующим аккаунтом в отдельном контексте — «другое устройство»."""
+    try:
+        context = browser.new_context(
+            viewport=VIEWPORT,
+            locale="ru-RU",
+            permissions=["microphone", "camera", "notifications"],
+        )
+        page = context.new_page()
+        shooter = Shooter(page, base_url)
+        shooter.goto("/onboarding")
+        shooter.settle(400)
+        page.click('[data-action="next"][data-from="lang"]')
+        shooter.settle(250)
+        page.fill("#ob-username", username)
+        page.fill("#ob-password", password)
+        page.click("#ob-submit")
+        shooter.settle(900)
+        page.click('[data-action="finish"]')
+        page.wait_for_url(f"{base_url}/app", timeout=15000)
+        page.wait_for_function("document.body.dataset.ready === 'true'", timeout=15000)
+        shooter.settle(400)
+        return context, page
+    except Exception as error:  # noqa: BLE001 - скриншот важнее падения сценария
+        print(f"  ! второе устройство не поднялось: {error}")
+        return None, None
+
+
 def open_second_peer(browser, base_url: str):
     """Второй браузерный контекст: регистрация + вход в комнату channel-2."""
     try:
@@ -289,12 +324,14 @@ def open_second_peer(browser, base_url: str):
         shooter.settle(400)
         page.click('[data-action="next"][data-from="lang"]')
         shooter.settle(250)
-        page.click('[data-action="next"][data-from="theme"]')
-        shooter.settle(250)
+        page.click('[data-account-mode="register"]')
+        shooter.settle(200)
         page.fill("#ob-username", "peer_user")
         page.fill("#ob-password", "peer_pass")
         page.fill("#ob-password2", "peer_pass")
         page.click("#ob-submit")
+        shooter.settle(900)
+        page.click('[data-action="finish"]')
         page.wait_for_url(f"{base_url}/app", timeout=15000)
         page.wait_for_function("document.body.dataset.ready === 'true'", timeout=15000)
         shooter.settle(400)
@@ -341,8 +378,8 @@ def run() -> int:
 
             print("→ онбординг")
             shooter.step_lang()
+            shooter.step_account()
             shooter.step_theme()
-            shooter.step_register()
             shooter.register()
 
             print("→ приложение")
@@ -472,6 +509,24 @@ def run() -> int:
                     shooter.shoot("app-voice-fullscreen.png")
                     shooter.page.keyboard.press("Escape")
                     shooter.settle(500)
+
+                    # --- мультидевайс: то же устройство второго участника
+                    #     заходит в тот же канал повторно ---
+                    print("→ мультидевайс: второе устройство того же аккаунта")
+                    second_context, second_page = _login_peer(browser, base_url, "peer_user", "peer_pass")
+                    if second_context is not None:
+                        try:
+                            twin = Shooter(second_page, base_url)
+                            twin.open_room("channel-2")
+                            twin.settle(400)
+                            twin.join_voice()
+                            twin.settle(2600)
+                            shooter.settle(1500)
+                            shooter.page.click('[data-voice-room="channel-2"]')
+                            shooter.settle(700)
+                            shooter.shoot("app-voice-multidevice.png")
+                        finally:
+                            second_context.close()
                 finally:
                     other_context.close()
 
